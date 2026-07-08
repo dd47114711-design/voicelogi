@@ -264,18 +264,41 @@ def get_dispatch_entry(conn, entry_id):
     ).fetchone()
 
 
-def update_dispatch_entry(conn, entry_id, **fields):
+class ConcurrentUpdateError(Exception):
+    """expected_version が現在のversionと一致しない場合(他端末が先に更新した場合)に送出する。"""
+
+
+def update_dispatch_entry(conn, entry_id, expected_version=None, **fields):
     """fields はホワイトリスト(_DISPATCH_ENTRY_UPDATABLE_FIELDS)の範囲でのみ更新を許可する。
-    Flaskルートからフォーム値を渡す場合でも任意カラムを書けないようにするための防御。"""
+    Flaskルートからフォーム値を渡す場合でも任意カラムを書けないようにするための防御。
+
+    expected_version を渡すと楽観的排他制御を行う: 呼び出し側が最後に読み取った
+    version と現在のDB上の値が一致する場合のみ更新する(一致しなければ
+    ConcurrentUpdateError。他端末が同じ行を先に更新した場合に検知するため)。
+    updated_at は秒精度で同一秒内の連続更新を区別できないため使わない。
+    """
     if not fields:
         return
     unknown = set(fields) - _DISPATCH_ENTRY_UPDATABLE_FIELDS
     if unknown:
         raise ValueError(f"更新できないカラムです: {sorted(unknown)}")
-    set_clause = ", ".join(f"{key} = ?" for key in fields) + ", updated_at = datetime('now', 'localtime')"
+    set_clause = (
+        ", ".join(f"{key} = ?" for key in fields)
+        + ", version = version + 1, updated_at = datetime('now', 'localtime')"
+    )
     params = list(fields.values()) + [entry_id]
-    conn.execute(f"UPDATE dispatch_entries SET {set_clause} WHERE id = ?", params)
+    where = " WHERE id = ?"
+    if expected_version is not None:
+        where += " AND version = ?"
+        params.append(expected_version)
+    cur = conn.execute(f"UPDATE dispatch_entries SET {set_clause}{where}", params)
     conn.commit()
+    if expected_version is not None and cur.rowcount == 0:
+        if get_dispatch_entry(conn, entry_id) is None:
+            raise ValueError(f"dispatch_entry {entry_id} が見つかりません")
+        raise ConcurrentUpdateError(
+            f"dispatch_entry {entry_id} は他の操作で更新済みです。最新の内容を読み込み直してください。"
+        )
 
 
 def confirm_entry_result(conn, entry_id, category, quantity, unit_price, operator, checked=1, memo=None):
@@ -377,3 +400,102 @@ def update_invoice_line_display_name(conn, line_id, display_name):
         "UPDATE invoice_lines SET display_name = ? WHERE id = ?", (display_name, line_id)
     )
     conn.commit()
+
+
+def list_invoices(conn, only_unreviewed=False):
+    query = (
+        "SELECT invoices.*, clients.name AS client_name FROM invoices "
+        "JOIN clients ON clients.id = invoices.client_id"
+    )
+    if only_unreviewed:
+        query += " WHERE last_reviewed_at IS NULL"
+    query += " ORDER BY invoices.created_at DESC"
+    return conn.execute(query).fetchall()
+
+
+def list_billing_summary(conn, period_start, period_end):
+    """月末締め作業画面用: 取引先ごとの未請求(実績確定・チェック済・未請求)件数を集計する。"""
+    return conn.execute(
+        """
+        SELECT clients.id AS client_id, clients.name AS client_name,
+               COUNT(dispatch_entries.id) AS unbilled_count
+        FROM clients
+        LEFT JOIN dispatch_entries ON dispatch_entries.client_id = clients.id
+            AND dispatch_entries.status = '実績確定'
+            AND dispatch_entries.checked = 1
+            AND dispatch_entries.invoice_id IS NULL
+            AND dispatch_entries.entry_date BETWEEN ? AND ?
+        WHERE clients.is_active = 1
+        GROUP BY clients.id
+        ORDER BY unbilled_count DESC, clients.name
+        """,
+        (period_start, period_end),
+    ).fetchall()
+
+
+# ---------- 会長の「見ました」記録(追記専用ログ + invoices側キャッシュ更新) ----------
+
+def add_invoice_review(conn, invoice_id, reviewed_by="会長"):
+    conn.execute(
+        "INSERT INTO invoice_review_logs (invoice_id, reviewed_by) VALUES (?, ?)",
+        (invoice_id, reviewed_by),
+    )
+    conn.execute(
+        "UPDATE invoices SET last_reviewed_by = ?, last_reviewed_at = datetime('now', 'localtime') "
+        "WHERE id = ?",
+        (reviewed_by, invoice_id),
+    )
+    conn.commit()
+
+
+def list_invoice_reviews(conn, invoice_id):
+    return conn.execute(
+        "SELECT * FROM invoice_review_logs WHERE invoice_id = ? ORDER BY reviewed_at", (invoice_id,)
+    ).fetchall()
+
+
+# ---------- 会長の「ちがう気がする」通知 ----------
+
+def raise_staff_alert(conn, target_type, target_ref):
+    cur = conn.execute(
+        "INSERT INTO staff_alerts (target_type, target_ref) VALUES (?, ?)",
+        (target_type, target_ref),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def list_open_staff_alerts(conn):
+    return conn.execute(
+        "SELECT * FROM staff_alerts WHERE resolved_at IS NULL ORDER BY raised_at"
+    ).fetchall()
+
+
+def get_open_alert_for_target(conn, target_type, target_ref):
+    return conn.execute(
+        "SELECT * FROM staff_alerts WHERE target_type = ? AND target_ref = ? AND resolved_at IS NULL "
+        "ORDER BY raised_at DESC LIMIT 1",
+        (target_type, target_ref),
+    ).fetchone()
+
+
+def resolve_staff_alert(conn, alert_id, resolved_by):
+    conn.execute(
+        "UPDATE staff_alerts SET resolved_by = ?, resolved_at = datetime('now', 'localtime') WHERE id = ?",
+        (resolved_by, alert_id),
+    )
+    conn.commit()
+
+
+# ---------- 事務員(名前を選ぶだけの簡易ログイン) ----------
+
+def list_staff_members(conn, include_inactive=False):
+    if include_inactive:
+        return conn.execute("SELECT * FROM staff_members ORDER BY name").fetchall()
+    return conn.execute("SELECT * FROM staff_members WHERE is_active = 1 ORDER BY name").fetchall()
+
+
+def get_or_create_staff_member(conn, name):
+    conn.execute("INSERT OR IGNORE INTO staff_members (name) VALUES (?)", (name,))
+    conn.commit()
+    return conn.execute("SELECT id FROM staff_members WHERE name = ?", (name,)).fetchone()["id"]
