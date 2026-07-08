@@ -4,6 +4,7 @@
 仕様書(チャット指示)に基づき、写真・既存ファイルなしでゼロから構築。
 ハイパーリンクによるシート間ナビゲーション方式(VBAマクロなし)。
 """
+import json
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -12,6 +13,14 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.formatting.rule import FormulaRule
 
 OUT_PATH = "/tmp/claude-0/-home-user-voicelogi/58cd87a9-9cb3-5ae1-b9a5-8edec09f8a7a/scratchpad/トラック配車システム_Excel版.xlsx"
+
+# 既存の「単価表(20260417)」から抽出した実データ(会社名, 昼, 夜, その他)。
+# 価格欄に日付・電話メモ等の文字列が混在している行はそのまま文字列として保持し、
+# 誤った数値変換をしないようにしている。
+with open("/tmp/claude-0/-home-user-voicelogi/58cd87a9-9cb3-5ae1-b9a5-8edec09f8a7a/scratchpad/price_data.json", encoding="utf-8") as f:
+    PRICE_DATA = json.load(f)
+N_COMPANIES = len(PRICE_DATA)
+MASTER_ROWS = max(120, N_COMPANIES + 20)  # 実データ86社+今後の追加余地
 
 wb = openpyxl.Workbook()
 wb.remove(wb.active)
@@ -84,15 +93,17 @@ def linked_cell(ws, ref, border=True):
 # 1. 隠しマスタ・裏集計シート
 # =====================================================================
 
-# --- 元請マスタ ---
+# --- 元請マスタ(既存の単価表から実在86社を投入) ---
 ws = wb.create_sheet("元請マスタ")
 ws["A1"] = "元請名"; ws["B1"] = "備考"
 style_header_row(ws, 1, 1, 2, 20)
 ws.column_dimensions["A"].width = 24
 ws.column_dimensions["B"].width = 30
-for r in range(2, 102):
+for r in range(2, MASTER_ROWS + 2):
     ws.cell(row=r, column=1).border = BORDER
     ws.cell(row=r, column=2).border = BORDER
+for i, (name, hiru, yoru, sonota) in enumerate(PRICE_DATA):
+    ws.cell(row=2 + i, column=1).value = name
 
 # --- 地名マスタ(現場名) ---
 ws = wb.create_sheet("地名マスタ")
@@ -117,7 +128,9 @@ ws.cell(row=r, column=4).number_format = "yyyy/mm/dd"
 for r in range(2, 102):
     ws.cell(row=r, column=4).number_format = "yyyy/mm/dd"
 
-# --- 運転手マスタ ---
+# --- 運転手マスタ(配車入力の写真にあった実在18名を投入) ---
+DRIVER_ROSTER = ["坂本", "松興", "興栄", "山田", "竹本", "中村", "金子", "フジタ", "永井",
+                  "久富", "水谷", "渡辺", "小田", "青木", "中本", "木内", "山住", "西本"]
 ws = wb.create_sheet("運転手マスタ")
 ws["A1"] = "運転手名"; ws["B1"] = "電話番号"; ws["C1"] = "備考"
 style_header_row(ws, 1, 1, 3, 20)
@@ -126,6 +139,8 @@ for col, w in zip("ABC", (16, 18, 30)):
 for r in range(2, 102):
     for c in range(1, 4):
         ws.cell(row=r, column=c).border = BORDER
+for i, name in enumerate(DRIVER_ROSTER):
+    ws.cell(row=2 + i, column=1).value = name
 
 # --- 傭車マスタ ---
 ws = wb.create_sheet("傭車マスタ")
@@ -138,20 +153,23 @@ for r in range(2, 102):
         ws.cell(row=r, column=c).border = BORDER
 
 # --- 単価マスタ(単価表を自動展開した参照用一覧) ---
+# 実際の単価表を確認したところ、4tは列ではなく「会社名 4t車」という別行で
+# 管理されていたため、区分は 昼/夜/その他 の3種類とし、4t車は単価表に
+# 別行(例:「〇〇建設 4t車」)として登録する運用にしている。
 ws = wb.create_sheet("単価マスタ")
 ws["A1"] = "会社名"; ws["B1"] = "区分"; ws["C1"] = "単価"; ws["D1"] = "適用開始日"
 style_header_row(ws, 1, 1, 4, 20)
 note_cell(ws, "F1", "※単価表シートの内容を自動展開した一覧です。直接編集しないでください。")
-CATS = ["昼", "夜", "4t", "その他"]
-CAT_COL = {"昼": "B", "夜": "C", "4t": "D", "その他": "E"}
+CATS = ["昼", "夜", "その他"]
+CAT_COL = {"昼": "B", "夜": "C", "その他": "D"}
 r_out = 2
-for i in range(50):  # 単価表 50社分
-    src_row = i + 2
+for i in range(MASTER_ROWS):
+    src_row = i + 5  # 単価表のデータ開始行(5)に合わせる
     for cat in CATS:
         ws.cell(row=r_out, column=1).value = f"=IF('単価表'!$A${src_row}=\"\",\"\",'単価表'!$A${src_row})"
         ws.cell(row=r_out, column=2).value = cat
         ws.cell(row=r_out, column=3).value = f"=IF('単価表'!${CAT_COL[cat]}${src_row}=\"\",\"\",'単価表'!${CAT_COL[cat]}${src_row})"
-        ws.cell(row=r_out, column=4).value = f"=IF('単価表'!$F${src_row}=\"\",\"\",'単価表'!$F${src_row})"
+        ws.cell(row=r_out, column=4).value = f"=IF('単価表'!$E${src_row}=\"\",\"\",'単価表'!$E${src_row})"
         r_out += 1
 for col, w in zip("ABCD", (22, 10, 12, 14)):
     ws.column_dimensions[col].width = w
@@ -183,12 +201,12 @@ print("マスタ・裏集計シート作成完了")
 def add_defined_name(name, ref):
     wb.defined_names[name] = DefinedName(name, attr_text=ref)
 
-add_defined_name("元請リスト", "元請マスタ!$A$2:$A$101")
+add_defined_name("元請リスト", f"元請マスタ!$A$2:$A${MASTER_ROWS + 1}")
 add_defined_name("現場リスト", "地名マスタ!$A$2:$A$201")
 add_defined_name("車番リスト", "車両マスタ!$A$2:$A$101")
 add_defined_name("運転手リスト", "運転手マスタ!$A$2:$A$101")
 add_defined_name("傭車リスト", "傭車マスタ!$A$2:$A$101")
-add_defined_name("区分リスト", "裏集計!$A$2:$A$5")
+add_defined_name("区分リスト", f"裏集計!$A$2:$A${1 + len(CATS)}")
 add_defined_name("傭車区分リスト", "裏集計!$B$2:$B$3")
 add_defined_name("チェックリスト", "裏集計!$C$2:$C$3")
 
@@ -201,33 +219,44 @@ ws = wb.create_sheet("単価表")
 ws.sheet_view.showGridLines = False
 title_cell(ws, "単価表")
 back_to_main_button(ws, "H1")
-note_cell(ws, "A2", "会社ごとに 昼/夜/4t/その他 の単価を管理します。適用開始日を分ければ単価改定にも対応できます。")
+note_cell(ws, "A2", "会社ごとに 昼/夜/その他 の単価を管理します。4t車は別行として「会社名　4t車」のように登録してください(既存の単価表の運用にあわせています)。適用開始日を分ければ単価改定にも対応できます。")
+note_cell(ws, "A3", f"既存の単価表(2026/4/17時点)から実在{N_COMPANIES}社を自動転記しました。日付・電話番号等のメモが混在していた価格欄はそのまま文字列で転記しているため、数値に直す場合はセルを直接編集してください。")
 
-headers = ["会社名", "昼", "夜", "4t", "その他", "適用開始日", "備考"]
+PRICE_DATA_START = 5
+PRICE_DATA_END = PRICE_DATA_START + MASTER_ROWS - 1
+
+headers = ["会社名", "昼", "夜", "その他", "適用開始日", "備考"]
 for i, h in enumerate(headers, start=1):
     ws.cell(row=4, column=i).value = h
 style_header_row(ws, 4, 1, len(headers))
-widths = [22, 12, 12, 12, 12, 14, 30]
+widths = [26, 14, 14, 16, 14, 30]
 for i, w in enumerate(widths, start=1):
     ws.column_dimensions[get_column_letter(i)].width = w
 
-for r in range(5, 55):
-    for c in range(1, 8):
+for r in range(PRICE_DATA_START, PRICE_DATA_END + 1):
+    for c in range(1, 7):
         cell = ws.cell(row=r, column=c)
         cell.border = BORDER
-        if c in (2, 3, 4, 5):
+        input_cell(ws, cell.coordinate)
+        if c in (2, 3, 4):
             cell.number_format = "#,##0"
-            input_cell(ws, cell.coordinate)
-        elif c == 6:
+        elif c == 5:
             cell.number_format = "yyyy/mm/dd"
-            input_cell(ws, cell.coordinate)
-        elif c == 1:
-            input_cell(ws, cell.coordinate)
-        else:
-            input_cell(ws, cell.coordinate)
+
+# 実データ投入(会社名, 昼, 夜, その他)
+for i, (name, hiru, yoru, sonota) in enumerate(PRICE_DATA):
+    r = PRICE_DATA_START + i
+    ws.cell(row=r, column=1).value = name
+    ws.cell(row=r, column=2).value = hiru
+    ws.cell(row=r, column=3).value = yoru
+    ws.cell(row=r, column=4).value = sonota
+    # 文字列(日付・電話メモ混在)が入った価格セルは数値書式を外す
+    for col, val in ((2, hiru), (3, yoru), (4, sonota)):
+        if isinstance(val, str):
+            ws.cell(row=r, column=col).number_format = "General"
 
 ws.freeze_panes = "A5"
-ws.print_area = f"A1:G54"
+ws.print_area = f"A1:F{PRICE_DATA_END}"
 ws.page_setup.orientation = "landscape"
 ws.page_setup.fitToWidth = 1
 ws.page_setup.fitToHeight = 0
@@ -286,6 +315,40 @@ ws.conditional_formatting.add(
     FormulaRule(formula=[f"$F{DATA_START}=\"自社\""], fill=PatternFill("solid", fgColor="D9D9D9")),
 )
 
+# --- 出勤チェックパネル(K〜L列。紙の配車表にあった運転手一覧+○×チェック欄) ---
+note_cell(ws, "K2", "その日出勤している運転手を○/×でチェックできます(運転手マスタと連動)。")
+ws["K3"] = "出勤チェック(対象日)"
+ws["K3"].font = Font(bold=True, size=11)
+ws["L3"] = ""
+input_cell(ws, "L3"); ws["L3"].border = BORDER
+ws["L3"].number_format = "m/d(aaa)"
+
+ROSTER_HEADER_ROW = 4
+ROSTER_START = 5
+ROSTER_END = ROSTER_START + len(DRIVER_ROSTER) - 1
+ws.cell(row=ROSTER_HEADER_ROW, column=11).value = "運転手名"
+ws.cell(row=ROSTER_HEADER_ROW, column=12).value = "出勤"
+style_header_row(ws, ROSTER_HEADER_ROW, 11, 12, height=20)
+ws.column_dimensions["K"].width = 14
+ws.column_dimensions["L"].width = 10
+
+for i in range(len(DRIVER_ROSTER)):
+    r = ROSTER_START + i
+    name_cell = ws.cell(row=r, column=11)
+    name_cell.value = f"=IF(運転手マスタ!A{2 + i}=\"\",\"\",運転手マスタ!A{2 + i})"
+    name_cell.border = BORDER
+    linked_cell(ws, name_cell.coordinate)
+    name_cell.alignment = LEFT
+
+    chk_cell = ws.cell(row=r, column=12)
+    chk_cell.border = BORDER
+    input_cell(ws, chk_cell.coordinate)
+    chk_cell.alignment = CENTER
+
+dv_roster = DataValidation(type="list", formula1='"○,×"', allow_blank=True, showDropDown=False)
+ws.add_data_validation(dv_roster)
+dv_roster.add(f"L{ROSTER_START}:L{ROSTER_END}")
+
 ws.freeze_panes = f"A{DATA_START}"
 ws.print_area = f"A1:H{DATA_END}"
 ws.page_setup.orientation = "landscape"
@@ -303,11 +366,11 @@ ws = wb.create_sheet("請求用配車")
 ws.sheet_view.showGridLines = False
 title_cell(ws, "請求用配車(実績整理)")
 back_to_main_button(ws, "N1")
-note_cell(ws, "A2", "日付〜傭車名・備考は『配車入力』から自動転記されます(灰色セル)。運転手・区分・数量H・チェックは黄色セルに入力してください。単価は単価表から自動計算されます。")
+note_cell(ws, "A2", "日付〜傭車名・備考は『配車入力』から自動転記されます(灰色セル)。運転手・区分・数量H・チェックは黄色セルに入力してください。単価は単価表から自動計算されます。4t車の場合は『配車入力』の元請欄で「会社名 4t車」を選んでください。")
 note_cell(ws, "A3", "右側の『請求書貼付用』(N〜T列)は、フィルタで元請・チェック=済を絞り込んだ後、請求書シートへコピー貼り付けするための整形済みデータです。")
 
 BILL_HEADERS = ["日付", "元請", "現場名", "台数", "自社車番", "運転手", "傭車名",
-                "区分(昼/夜/4t/その他)", "数量H", "単価", "金額", "チェック", "備考"]
+                "区分(昼/夜/その他)", "数量H", "単価", "金額", "チェック", "備考"]
 HEADER_ROW = 4
 DATA_START = 5
 DATA_END = 204
@@ -364,8 +427,9 @@ for r in range(DATA_START, DATA_END + 1):
     # --- 単価(単価表から自動計算) ---
     price_cell = ws.cell(row=r, column=10)
     price_cell.value = (
-        f"=IFERROR(INDEX('単価表'!$B$5:$E$54,MATCH($B{r},'単価表'!$A$5:$A$54,0),"
-        f"MATCH($H{r},{{\"昼\",\"夜\",\"4t\",\"その他\"}},0)),\"\")"
+        f"=IFERROR(INDEX('単価表'!$B${PRICE_DATA_START}:$D${PRICE_DATA_END},"
+        f"MATCH($B{r},'単価表'!$A${PRICE_DATA_START}:$A${PRICE_DATA_END},0),"
+        f"MATCH($H{r},{{\"昼\",\"夜\",\"その他\"}},0)),\"\")"
     )
     price_cell.number_format = "#,##0"
     price_cell.border = BORDER
@@ -462,7 +526,7 @@ ws["E4"].number_format = "#,##0円"
 ws["E4"].font = Font(bold=True, size=12)
 ws["E4"].alignment = LEFT
 
-note_cell(ws, "A6", "同じ名称が続く場合は自動的に「〃」と表示されます。")
+note_cell(ws, "A6", "同じ名称が続く場合は自動的に「〃」と表示されます。金額=数量×単価で自動計算されます(数量は基本「台数×8H」を入力)。")
 note_cell(ws, "A7", "A〜H列はすべて自動表示です。直接入力せず、J〜P列(貼付欄)に入力するか、『請求用配車』シートでフィルタした行(N〜T列)をコピーしてJ列へ値貼り付けしてください。")
 
 # --- 明細ヘッダー(表示専用・すべて数式) ---
@@ -516,9 +580,9 @@ for r in range(DETAIL_START, DETAIL_END + 1):
     d_cell.number_format = "#,##0"
     e_cell.number_format = "#,##0"
 
-    # F 金額 = 台数 × 8H × 単価 (自動計算)
+    # F 金額 = 数量 × 単価 (自動計算)。数量は基本的に「台数×8H」を入力する運用。
     f_cell = ws.cell(row=r, column=6)
-    f_cell.value = f"=IF(AND($C{r}<>\"\",$E{r}<>\"\"),$C{r}*8*$E{r},\"\")"
+    f_cell.value = f"=IF(AND($D{r}<>\"\",$E{r}<>\"\"),$D{r}*$E{r},\"\")"
     f_cell.number_format = "#,##0"
 
     # G 車番 = O, H 備考 = P
@@ -547,39 +611,59 @@ print("請求書シート作成完了")
 ws = wb.create_sheet("自社売上票")
 ws.sheet_view.showGridLines = False
 title_cell(ws, "自社売上票")
-back_to_main_button(ws, "AI1")
 
 ws["A3"] = "対象月"
 ws["A3"].font = Font(bold=True)
 ws["B3"] = ""
 input_cell(ws, "B3"); ws["B3"].border = BORDER
 ws["B3"].number_format = "yyyy年m月"
-note_cell(ws, "D3", "日別売上欄には金額を入力してください。休みの日は「休」と入力すると月合計・日数の計算から自動で除外されます。")
+note_cell(ws, "D3", "日ごとに売上・距離(km)・燃費を入力してください。休みの日は売上欄に「休」と入力すると月合計・日数の計算から自動で除外されます。")
 
-SALES_HEADER_ROW = 5
-SALES_DATA_START = 6
-SALES_DATA_END = 25  # 自社車両20台分
+SALES_ROW1 = 5   # 日付番号(3列結合)
+SALES_ROW2 = 6   # 売上/距離/燃費 の見出し
+SALES_DATA_START = 7
+SALES_DATA_END = 26  # 自社車両20台分
 
-ws.cell(row=SALES_HEADER_ROW, column=1).value = "運転手名"
-ws.cell(row=SALES_HEADER_ROW, column=2).value = "車検日"
-ws.cell(row=SALES_HEADER_ROW, column=3).value = "車番"
-for d in range(1, 32):
-    ws.cell(row=SALES_HEADER_ROW, column=3 + d).value = d
-DAY_LAST_COL = 3 + 31  # =34 (AH)
-ws.cell(row=SALES_HEADER_ROW, column=DAY_LAST_COL + 1).value = "休"
-ws.cell(row=SALES_HEADER_ROW, column=DAY_LAST_COL + 2).value = "月合計"
-ws.cell(row=SALES_HEADER_ROW, column=DAY_LAST_COL + 3).value = "日数"
-ws.cell(row=SALES_HEADER_ROW, column=DAY_LAST_COL + 4).value = "1日平均"
-LAST_COL = DAY_LAST_COL + 4  # =38 (AL)
-style_header_row(ws, SALES_HEADER_ROW, 1, LAST_COL, height=22)
+DAY_BLOCK_START = 4          # D列から日ブロック開始
+SUB_LABELS = ["売上", "距離(km)", "燃費"]
+N_DAYS = 31
 
-ws.column_dimensions["A"].width = 14
-ws.column_dimensions["B"].width = 12
-ws.column_dimensions["C"].width = 12
-for d in range(1, 32):
-    ws.column_dimensions[get_column_letter(3 + d)].width = 7
-for off, w in zip(range(1, 5), (7, 12, 7, 10)):
-    ws.column_dimensions[get_column_letter(DAY_LAST_COL + off)].width = w
+# 左側の固定列(運転手名・車検日・車番)は2段ヘッダーを縦結合
+for col, label, w in ((1, "運転手名", 14), (2, "車検日", 12), (3, "車番", 12)):
+    ws.merge_cells(start_row=SALES_ROW1, start_column=col, end_row=SALES_ROW2, end_column=col)
+    ws.cell(row=SALES_ROW1, column=col).value = label
+    ws.column_dimensions[get_column_letter(col)].width = w
+
+# 日ブロック(31日 × 3列)
+for d in range(1, N_DAYS + 1):
+    block_start = DAY_BLOCK_START + (d - 1) * 3
+    ws.merge_cells(start_row=SALES_ROW1, start_column=block_start,
+                    end_row=SALES_ROW1, end_column=block_start + 2)
+    ws.cell(row=SALES_ROW1, column=block_start).value = d
+    for s, label in enumerate(SUB_LABELS):
+        c = ws.cell(row=SALES_ROW2, column=block_start + s)
+        c.value = label
+        ws.column_dimensions[get_column_letter(block_start + s)].width = 9 if s == 0 else 7
+
+DAY_BLOCK_END = DAY_BLOCK_START + N_DAYS * 3 - 1  # 最終日の燃費列
+
+# 右側の集計列(休/月合計/距離合計/日数/1日平均)も2段ヘッダーを縦結合
+SUMMARY_LABELS = ["休", "月合計", "距離合計", "日数", "1日平均"]
+SUMMARY_WIDTHS = [7, 12, 12, 7, 10]
+summary_cols = list(range(DAY_BLOCK_END + 1, DAY_BLOCK_END + 1 + len(SUMMARY_LABELS)))
+for col, label, w in zip(summary_cols, SUMMARY_LABELS, SUMMARY_WIDTHS):
+    ws.merge_cells(start_row=SALES_ROW1, start_column=col, end_row=SALES_ROW2, end_column=col)
+    ws.cell(row=SALES_ROW1, column=col).value = label
+    ws.column_dimensions[get_column_letter(col)].width = w
+LAST_COL = summary_cols[-1]
+
+back_to_main_button(ws, f"{get_column_letter(LAST_COL + 2)}1")
+
+style_header_row(ws, SALES_ROW1, 1, LAST_COL, height=20)
+style_header_row(ws, SALES_ROW2, 1, LAST_COL, height=18)
+
+sales_cols = [DAY_BLOCK_START + (d - 1) * 3 for d in range(1, N_DAYS + 1)]
+distance_cols = [c + 1 for c in sales_cols]
 
 for r in range(SALES_DATA_START, SALES_DATA_END + 1):
     ws.row_dimensions[r].height = 20
@@ -590,26 +674,41 @@ for r in range(SALES_DATA_START, SALES_DATA_END + 1):
         input_cell(ws, cell.coordinate)
     ws.cell(row=r, column=2).number_format = "yyyy/mm/dd"
 
-    day_range = f"{get_column_letter(4)}{r}:{get_column_letter(DAY_LAST_COL)}{r}"
-    for d in range(1, 32):
-        cell = ws.cell(row=r, column=3 + d)
-        cell.border = BORDER
-        input_cell(ws, cell.coordinate)
-        cell.number_format = "#,##0"
-        cell.alignment = CENTER
+    for d in range(1, N_DAYS + 1):
+        block_start = DAY_BLOCK_START + (d - 1) * 3
+        sales_cell = ws.cell(row=r, column=block_start)
+        dist_cell = ws.cell(row=r, column=block_start + 1)
+        fuel_cell = ws.cell(row=r, column=block_start + 2)
+        for cell in (sales_cell, dist_cell, fuel_cell):
+            cell.border = BORDER
+            input_cell(ws, cell.coordinate)
+            cell.alignment = CENTER
+        sales_cell.number_format = "#,##0"
+        dist_cell.number_format = "0"
+        fuel_cell.number_format = "0.00"
 
-    rest_cell = ws.cell(row=r, column=DAY_LAST_COL + 1)
-    rest_cell.value = f'=COUNTIF({day_range},"休")'
-    total_cell = ws.cell(row=r, column=DAY_LAST_COL + 2)
-    total_cell.value = f"=SUM({day_range})"
+    sales_refs = [f"{get_column_letter(c)}{r}" for c in sales_cols]
+    dist_refs = [f"{get_column_letter(c)}{r}" for c in distance_cols]
+
+    rest_cell = ws.cell(row=r, column=summary_cols[0])
+    rest_cell.value = "=" + "+".join(f'COUNTIF({ref},"休")' for ref in sales_refs)
+
+    total_cell = ws.cell(row=r, column=summary_cols[1])
+    total_cell.value = "=SUM(" + ",".join(sales_refs) + ")"
     total_cell.number_format = "#,##0"
-    count_cell = ws.cell(row=r, column=DAY_LAST_COL + 3)
-    count_cell.value = f"=COUNT({day_range})"
-    avg_cell = ws.cell(row=r, column=DAY_LAST_COL + 4)
+
+    dist_total_cell = ws.cell(row=r, column=summary_cols[2])
+    dist_total_cell.value = "=SUM(" + ",".join(dist_refs) + ")"
+    dist_total_cell.number_format = "#,##0"
+
+    count_cell = ws.cell(row=r, column=summary_cols[3])
+    count_cell.value = "=COUNT(" + ",".join(sales_refs) + ")"
+
+    avg_cell = ws.cell(row=r, column=summary_cols[4])
     avg_cell.value = f"=IFERROR({total_cell.coordinate}/{count_cell.coordinate},0)"
     avg_cell.number_format = "#,##0"
 
-    for cell in (rest_cell, total_cell, count_cell, avg_cell):
+    for cell in (rest_cell, total_cell, dist_total_cell, count_cell, avg_cell):
         cell.border = BORDER
         linked_cell(ws, cell.coordinate)
         cell.alignment = CENTER
@@ -693,7 +792,7 @@ BUTTON_LAYOUT = [
     ("配車入力", "明日の配車を組む(毎日の入力はここから)"),
     ("請求用配車", "実績を整理する(請求書のもと)"),
     ("自社売上票", "自社車両の日別売上を管理する"),
-    ("単価表", "会社ごとの単価(昼/夜/4t/その他)を管理する"),
+    ("単価表", "会社ごとの単価(昼/夜/その他)を管理する"),
     ("請求書", "請求書を作成する"),
     ("印刷", "配車表を印刷する"),
 ]
