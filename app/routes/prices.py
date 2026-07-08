@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-from flask import Blueprint, g, redirect, render_template, request, url_for
+import os
+import tempfile
+
+from flask import Blueprint, g, redirect, render_template, request, send_file, url_for
 
 from .. import models
 from ..auth import current_staff, login_required
+from ..export import excel_export
 
 bp = Blueprint("prices", __name__, url_prefix="/prices")
 
@@ -19,6 +23,16 @@ def index():
 def needs_review():
     prices = [p for p in models.list_all_prices(g.db) if p["amount"] is None and p["note"]]
     return render_template("staff/prices_needs_review.html", prices=prices)
+
+
+@bp.route("/needs-review/print")
+@login_required
+def print_needs_review():
+    wb = excel_export.build_price_review_worksheet(g.db)
+    fd, path = tempfile.mkstemp(suffix=".xlsx", prefix="単価確認シート_")
+    os.close(fd)
+    wb.save(path)
+    return send_file(path, as_attachment=False, download_name="単価確認シート.xlsx")
 
 
 @bp.route("/<int:client_id>/<category>/update", methods=["POST"])

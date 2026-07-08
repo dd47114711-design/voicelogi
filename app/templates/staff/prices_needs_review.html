@@ -3,6 +3,7 @@
 {% block content %}
 <h1>単価 要確認一覧</h1>
 <p class="note">自動判定できなかった単価データです。実際の単価を確認のうえ、単価表画面で金額を入力してください。</p>
+<p><a class="btn" href="{{ url_for('prices.print_needs_review') }}" target="_blank">印刷する(単価確認シート)</a></p>
 <table class="grid">
   <thead><tr><th>取引先</th><th>区分</th><th>もとの記録</th><th></th></tr></thead>
   <tbody>
