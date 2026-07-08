@@ -10,9 +10,13 @@ SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 def get_connection(db_path=DB_PATH):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # 複数タブレット/PCからの同時アクセスを想定し、WALモード+busy_timeoutで
+    # "database is locked" を避ける(書き込み中でも他接続が読み取り可能になる)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")
     return conn
 
 

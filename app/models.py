@@ -1,14 +1,33 @@
 # -*- coding: utf-8 -*-
 """DBアクセス関数群。小規模運用(1日10〜30件・取引先10〜50社)のため、
-ORMは使わずsqlite3を直接ラップするだけに留めている。"""
+ORMは使わずsqlite3を直接ラップするだけに留めている。
+
+設計メモ(レビュー指摘の反映):
+- マスタは物理削除せず is_active による論理削除にする(既存の配車実績が
+  参照している行を消すと外部キーが壊れるため)。
+- update_dispatch_entry は Flask ルートから **request.form 相当のdictを
+  渡すことを想定しているため、任意カラムを書けないようホワイトリストで絞る。
+- 単価修正・実績確定・請求書発行には operator(担当者名)を必須で残し、
+  「誰がいつ確定・修正したか」を追えるようにする。
+"""
 
 CATEGORIES = ["昼", "夜", "その他"]
+
+# update_dispatch_entry で更新を許可するカラムのホワイトリスト
+_DISPATCH_ENTRY_UPDATABLE_FIELDS = {
+    "entry_date", "client_id", "client_name_snapshot", "site_id", "site_name_snapshot",
+    "count", "vehicle_id", "driver_id", "is_subcontractor", "subcontractor_id",
+    "subcontractor_name_snapshot", "category", "quantity", "unit_price", "checked",
+    "memo", "status", "confirmed_by", "confirmed_at", "invoice_id",
+}
 
 
 # ---------- マスタ: 元請 ----------
 
-def list_clients(conn):
-    return conn.execute("SELECT * FROM clients ORDER BY name").fetchall()
+def list_clients(conn, include_inactive=False):
+    if include_inactive:
+        return conn.execute("SELECT * FROM clients ORDER BY name").fetchall()
+    return conn.execute("SELECT * FROM clients WHERE is_active = 1 ORDER BY name").fetchall()
 
 
 def get_client(conn, client_id):
@@ -21,14 +40,30 @@ def create_client(conn, name, note=None):
     return cur.lastrowid
 
 
+def get_or_create_client(conn, name, note=None):
+    """既存なら再利用、なければ作成する冪等な取得関数(初期投入・再実行に安全)。"""
+    conn.execute("INSERT OR IGNORE INTO clients (name, note) VALUES (?, ?)", (name, note))
+    conn.commit()
+    return conn.execute("SELECT id FROM clients WHERE name = ?", (name,)).fetchone()["id"]
+
+
+def deactivate_client(conn, client_id):
+    conn.execute("UPDATE clients SET is_active = 0 WHERE id = ?", (client_id,))
+    conn.commit()
+
+
 # ---------- マスタ: 現場 ----------
 
-def list_sites(conn, client_id=None):
+def list_sites(conn, client_id=None, include_inactive=False):
+    query = "SELECT * FROM sites WHERE 1=1"
+    params = []
+    if not include_inactive:
+        query += " AND is_active = 1"
     if client_id:
-        return conn.execute(
-            "SELECT * FROM sites WHERE client_id = ? ORDER BY name", (client_id,)
-        ).fetchall()
-    return conn.execute("SELECT * FROM sites ORDER BY name").fetchall()
+        query += " AND client_id = ?"
+        params.append(client_id)
+    query += " ORDER BY name"
+    return conn.execute(query, params).fetchall()
 
 
 def create_site(conn, name, client_id=None, note=None):
@@ -39,10 +74,17 @@ def create_site(conn, name, client_id=None, note=None):
     return cur.lastrowid
 
 
+def deactivate_site(conn, site_id):
+    conn.execute("UPDATE sites SET is_active = 0 WHERE id = ?", (site_id,))
+    conn.commit()
+
+
 # ---------- マスタ: 車両 ----------
 
-def list_vehicles(conn):
-    return conn.execute("SELECT * FROM vehicles ORDER BY plate_no").fetchall()
+def list_vehicles(conn, include_inactive=False):
+    if include_inactive:
+        return conn.execute("SELECT * FROM vehicles ORDER BY plate_no").fetchall()
+    return conn.execute("SELECT * FROM vehicles WHERE is_active = 1 ORDER BY plate_no").fetchall()
 
 
 def create_vehicle(conn, plate_no, vehicle_type=None, default_driver_id=None, shaken_date=None, note=None):
@@ -55,10 +97,17 @@ def create_vehicle(conn, plate_no, vehicle_type=None, default_driver_id=None, sh
     return cur.lastrowid
 
 
+def deactivate_vehicle(conn, vehicle_id):
+    conn.execute("UPDATE vehicles SET is_active = 0 WHERE id = ?", (vehicle_id,))
+    conn.commit()
+
+
 # ---------- マスタ: 運転手 ----------
 
-def list_drivers(conn):
-    return conn.execute("SELECT * FROM drivers ORDER BY name").fetchall()
+def list_drivers(conn, include_inactive=False):
+    if include_inactive:
+        return conn.execute("SELECT * FROM drivers ORDER BY name").fetchall()
+    return conn.execute("SELECT * FROM drivers WHERE is_active = 1 ORDER BY name").fetchall()
 
 
 def create_driver(conn, name, phone=None, note=None):
@@ -69,10 +118,23 @@ def create_driver(conn, name, phone=None, note=None):
     return cur.lastrowid
 
 
+def get_or_create_driver(conn, name, phone=None, note=None):
+    conn.execute("INSERT OR IGNORE INTO drivers (name, phone, note) VALUES (?, ?, ?)", (name, phone, note))
+    conn.commit()
+    return conn.execute("SELECT id FROM drivers WHERE name = ?", (name,)).fetchone()["id"]
+
+
+def deactivate_driver(conn, driver_id):
+    conn.execute("UPDATE drivers SET is_active = 0 WHERE id = ?", (driver_id,))
+    conn.commit()
+
+
 # ---------- マスタ: 傭車 ----------
 
-def list_subcontractors(conn):
-    return conn.execute("SELECT * FROM subcontractors ORDER BY name").fetchall()
+def list_subcontractors(conn, include_inactive=False):
+    if include_inactive:
+        return conn.execute("SELECT * FROM subcontractors ORDER BY name").fetchall()
+    return conn.execute("SELECT * FROM subcontractors WHERE is_active = 1 ORDER BY name").fetchall()
 
 
 def create_subcontractor(conn, name, contact=None, note=None):
@@ -81,6 +143,35 @@ def create_subcontractor(conn, name, contact=None, note=None):
     )
     conn.commit()
     return cur.lastrowid
+
+
+def deactivate_subcontractor(conn, subcontractor_id):
+    conn.execute("UPDATE subcontractors SET is_active = 0 WHERE id = ?", (subcontractor_id,))
+    conn.commit()
+
+
+# ---------- 自社情報(請求書発行元・登録番号) ----------
+
+def get_company_profile(conn):
+    return conn.execute("SELECT * FROM company_profile WHERE id = 1").fetchone()
+
+
+def set_company_profile(conn, company_name, registration_number=None, address=None,
+                         phone=None, bank_info=None):
+    conn.execute(
+        """
+        INSERT INTO company_profile (id, company_name, registration_number, address, phone, bank_info)
+        VALUES (1, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            company_name = excluded.company_name,
+            registration_number = excluded.registration_number,
+            address = excluded.address,
+            phone = excluded.phone,
+            bank_info = excluded.bank_info
+        """,
+        (company_name, registration_number, address, phone, bank_info),
+    )
+    conn.commit()
 
 
 # ---------- 単価表 ----------
@@ -101,17 +192,19 @@ def list_all_prices(conn):
     ).fetchall()
 
 
-def upsert_price(conn, client_id, category, amount=None, note=None, effective_date=None):
+def upsert_price(conn, client_id, category, amount=None, note=None, effective_date=None, updated_by=None):
     conn.execute(
         """
-        INSERT INTO prices (client_id, category, amount, note, effective_date)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO prices (client_id, category, amount, note, effective_date, updated_by, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
         ON CONFLICT(client_id, category) DO UPDATE SET
             amount = excluded.amount,
             note = excluded.note,
-            effective_date = excluded.effective_date
+            effective_date = excluded.effective_date,
+            updated_by = excluded.updated_by,
+            updated_at = datetime('now', 'localtime')
         """,
-        (client_id, category, amount, note, effective_date),
+        (client_id, category, amount, note, effective_date, updated_by),
     )
     conn.commit()
 
@@ -172,21 +265,31 @@ def get_dispatch_entry(conn, entry_id):
 
 
 def update_dispatch_entry(conn, entry_id, **fields):
+    """fields はホワイトリスト(_DISPATCH_ENTRY_UPDATABLE_FIELDS)の範囲でのみ更新を許可する。
+    Flaskルートからフォーム値を渡す場合でも任意カラムを書けないようにするための防御。"""
     if not fields:
         return
-    set_clause = ", ".join(f"{key} = ?" for key in fields) + ", updated_at = datetime('now')"
+    unknown = set(fields) - _DISPATCH_ENTRY_UPDATABLE_FIELDS
+    if unknown:
+        raise ValueError(f"更新できないカラムです: {sorted(unknown)}")
+    set_clause = ", ".join(f"{key} = ?" for key in fields) + ", updated_at = datetime('now', 'localtime')"
     params = list(fields.values()) + [entry_id]
     conn.execute(f"UPDATE dispatch_entries SET {set_clause} WHERE id = ?", params)
     conn.commit()
 
 
-def confirm_entry_result(conn, entry_id, category, quantity, unit_price, checked=1, memo=None):
-    """配車入力を『実績確定』にし、区分・数量・単価・チェック状態を記録する。"""
+def confirm_entry_result(conn, entry_id, category, quantity, unit_price, operator, checked=1, memo=None):
+    """配車入力を『実績確定』にし、区分・数量・単価・チェック状態・担当者を記録する。"""
     update_dispatch_entry(
         conn, entry_id,
         category=category, quantity=quantity, unit_price=unit_price,
         checked=checked, memo=memo, status="実績確定",
+        confirmed_by=operator, confirmed_at=_now_localtime(conn),
     )
+
+
+def _now_localtime(conn):
+    return conn.execute("SELECT datetime('now', 'localtime') AS now").fetchone()["now"]
 
 
 def list_billable_entries(conn, client_id, period_start, period_end):
@@ -208,10 +311,23 @@ def list_billable_entries(conn, client_id, period_start, period_end):
 
 # ---------- 請求書 ----------
 
-def create_invoice(conn, client_id, invoice_date, period_start, period_end):
+def create_invoice(conn, client_id, invoice_date, period_start, period_end,
+                    client_name_snapshot, issuer_name_snapshot,
+                    subtotal_amount, tax_amount, total_amount,
+                    issuer_registration_number_snapshot=None, tax_rate=0.10, created_by=None):
+    """請求書発行時点の金額・発行元情報をそのままDBに固定保存する。
+    後日マスタ(単価・会社名・登録番号)が変わっても、発行済み請求書の内容は変わらない。"""
     cur = conn.execute(
-        "INSERT INTO invoices (client_id, invoice_date, period_start, period_end) VALUES (?, ?, ?, ?)",
-        (client_id, invoice_date, period_start, period_end),
+        """
+        INSERT INTO invoices
+            (client_id, invoice_date, period_start, period_end, client_name_snapshot,
+             issuer_name_snapshot, issuer_registration_number_snapshot,
+             subtotal_amount, tax_rate, tax_amount, total_amount, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (client_id, invoice_date, period_start, period_end, client_name_snapshot,
+         issuer_name_snapshot, issuer_registration_number_snapshot,
+         subtotal_amount, tax_rate, tax_amount, total_amount, created_by),
     )
     conn.commit()
     return cur.lastrowid
@@ -241,10 +357,11 @@ def add_invoice_line(conn, invoice_id, dispatch_entry_id, sort_order, entry_date
         (invoice_id, dispatch_entry_id, sort_order, entry_date, display_name,
          count, quantity, unit_price, amount, vehicle_no, memo),
     )
-    conn.execute(
-        "UPDATE dispatch_entries SET invoice_id = ? WHERE id = ?",
-        (invoice_id, dispatch_entry_id),
-    )
+    if dispatch_entry_id is not None:
+        conn.execute(
+            "UPDATE dispatch_entries SET invoice_id = ? WHERE id = ?",
+            (invoice_id, dispatch_entry_id),
+        )
     conn.commit()
 
 
