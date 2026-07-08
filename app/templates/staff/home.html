@@ -1,0 +1,35 @@
+{% extends "staff/base.html" %}
+{% block title %}事務員用メニュー{% endblock %}
+{% block content %}
+<h1>
+  事務員用メニュー
+  {% if alerts %}<span class="badge-alert">🔴 会長からの連絡 {{ alerts|length }}件</span>{% endif %}
+</h1>
+
+{% if alerts %}
+<div class="card">
+  <h2>会長からの連絡</h2>
+  <ul>
+    {% for a in alerts %}
+      <li>
+        {% if a['target_type'] == 'dispatch_day' %}
+          配車({{ a['target_ref'] }})について「ちがう気がする」との連絡があります
+        {% else %}
+          <a href="{{ url_for('invoice.view', invoice_id=a['target_ref']) }}">請求書(#{{ a['target_ref'] }})</a>について「ちがう気がする」との連絡があります
+        {% endif %}
+        ({{ a['raised_at'] }})
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <a class="btn" href="{{ url_for('dispatch.grid') }}">配車入力</a>
+  <a class="btn" href="{{ url_for('billing.index') }}">実績整理</a>
+  <a class="btn" href="{{ url_for('invoice.closing') }}">月末締め作業</a>
+  <a class="btn" href="{{ url_for('prices.index') }}">単価表</a>
+  <a class="btn" href="{{ url_for('prices.needs_review') }}">⚠要確認一覧</a>
+  <a class="btn" href="{{ url_for('masters.index') }}">マスタ管理</a>
+</div>
+{% endblock %}

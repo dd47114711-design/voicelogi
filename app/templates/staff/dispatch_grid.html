@@ -1,0 +1,60 @@
+{% extends "staff/base.html" %}
+{% import "staff/_dispatch_row_macro.html" as row_macro %}
+{% block title %}配車入力 {{ date_str }}{% endblock %}
+{% block content %}
+<h1>配車入力</h1>
+<div class="toolbar">
+  <a class="btn secondary" href="{{ url_for('dispatch.grid', date=prev_date) }}">&lt; 前日</a>
+  <strong>{{ date.strftime('%Y/%m/%d') }}({{ ['月','火','水','木','金','土','日'][date.weekday()] }})</strong>
+  <a class="btn secondary" href="{{ url_for('dispatch.grid', date=next_date) }}">翌日 &gt;</a>
+  <div class="spacer"></div>
+  <form method="get" action="{{ url_for('dispatch.search') }}">
+    <input type="text" name="q" placeholder="🔍 元請/車番/運転手で検索">
+    <button type="submit" class="secondary">検索</button>
+  </form>
+</div>
+
+<div class="toolbar">
+  <form method="post" action="{{ url_for('dispatch.copy_previous_day') }}" onsubmit="return confirm('前日の内容をこの日にコピーします。よろしいですか？');">
+    <input type="hidden" name="date" value="{{ date_str }}">
+    <button type="submit" class="secondary">前日の内容をコピー</button>
+  </form>
+  <button type="button" id="add-row-btn">＋行を追加</button>
+  <div class="spacer"></div>
+  <a class="btn secondary" href="{{ url_for('dispatch.print_day', date=date_str) }}" target="_blank">印刷(紙の配車表)</a>
+</div>
+
+<datalist id="site-name-options">
+  {% for e in entries %}{% if e['site_name_snapshot'] %}<option value="{{ e['site_name_snapshot'] }}">{% endif %}{% endfor %}
+</datalist>
+
+<table class="grid" id="dispatch-table" data-entry-date="{{ date_str }}">
+  <thead>
+    <tr>
+      <th>No</th><th>元請</th><th>現場名</th><th>台数</th><th>車番</th><th>運転手</th><th>傭車</th><th>傭車名</th><th>備考</th><th>操作</th>
+    </tr>
+  </thead>
+  <tbody id="dispatch-tbody">
+    {% for entry in entries %}
+      {{ row_macro.render_row(entry, clients, vehicles, drivers, subcontractors) }}
+    {% endfor %}
+  </tbody>
+</table>
+
+<p class="note">
+  Tabキーで次の項目へ、Enterキーで次の行へ移動できます。セルから離れると自動で保存されます(●同期済み/○未保存/✕保存失敗のアイコンで状態が分かります)。
+  一覧にない元請・車番・運転手は「＋新規登録...」からその場で追加できます。
+</p>
+
+<script>
+window.VOICELOGI = {
+  createUrl: "{{ url_for('dispatch.create_entry') }}",
+  entryDate: "{{ date_str }}",
+  updateUrlTemplate: "{{ url_for('dispatch.update_entry', entry_id=0) }}",
+  duplicateUrlTemplate: "{{ url_for('dispatch.duplicate_entry', entry_id=0) }}",
+  deleteUrlTemplate: "{{ url_for('dispatch.delete_entry', entry_id=0) }}",
+  quickAddUrlTemplate: "{{ url_for('masters.quick_add', entity='ENTITY') }}",
+};
+</script>
+<script src="{{ url_for('static', filename='dispatch.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% macro render_row(entry, clients, vehicles, drivers, subcontractors) %}
+<tr class="dispatch-row {{ 'row-blank' if entry['client_id'] is none and entry['count'] is none else '' }}"
+    data-entry-id="{{ entry['id'] }}" data-version="{{ entry['version'] }}">
+  <td class="row-no"></td>
+  <td>
+    <select data-field="client_id">
+      <option value=""></option>
+      {% for c in clients %}
+        <option value="{{ c['id'] }}" {{ 'selected' if c['id'] == entry['client_id'] else '' }}>{{ c['name'] }}</option>
+      {% endfor %}
+      <option value="__new__">＋新規登録...</option>
+    </select>
+  </td>
+  <td><input type="text" data-field="site_name_snapshot" value="{{ entry['site_name_snapshot'] or '' }}" list="site-name-options"></td>
+  <td><input type="number" data-field="count" value="{{ entry['count'] if entry['count'] is not none else '' }}" min="0" style="width:4em"></td>
+  <td>
+    <select data-field="vehicle_id">
+      <option value=""></option>
+      {% for v in vehicles %}
+        <option value="{{ v['id'] }}" {{ 'selected' if v['id'] == entry['vehicle_id'] else '' }}>{{ v['plate_no'] }}</option>
+      {% endfor %}
+      <option value="__new__">＋新規登録...</option>
+    </select>
+  </td>
+  <td>
+    <select data-field="driver_id">
+      <option value=""></option>
+      {% for d in drivers %}
+        <option value="{{ d['id'] }}" {{ 'selected' if d['id'] == entry['driver_id'] else '' }}>{{ d['name'] }}</option>
+      {% endfor %}
+      <option value="__new__">＋新規登録...</option>
+    </select>
+  </td>
+  <td style="text-align:center">
+    <input type="checkbox" data-field="is_subcontractor" {{ 'checked' if entry['is_subcontractor'] else '' }}>
+  </td>
+  <td>
+    <select data-field="subcontractor_id">
+      <option value=""></option>
+      {% for s in subcontractors %}
+        <option value="{{ s['id'] }}" {{ 'selected' if s['id'] == entry['subcontractor_id'] else '' }}>{{ s['name'] }}</option>
+      {% endfor %}
+      <option value="__new__">＋新規登録...</option>
+    </select>
+  </td>
+  <td><input type="text" data-field="memo" value="{{ entry['memo'] or '' }}"></td>
+  <td class="row-actions">
+    <button type="button" class="secondary row-duplicate">⧉ 複製</button>
+    <button type="button" class="danger row-delete">削除</button>
+    <span class="sync-icon sync-ok">●同期済み</span>
+  </td>
+</tr>
+{% endmacro %}

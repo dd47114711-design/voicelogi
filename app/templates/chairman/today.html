@@ -1,0 +1,22 @@
+{% extends "chairman/base.html" %}
+{% block content %}
+<a class="back-link" href="{{ url_for('chairman.top') }}">戻る</a>
+<div class="chairman-title">今日の配車　{{ date_display }}</div>
+
+<div class="dispatch-list">
+  {% for e in entries %}
+  <div class="dispatch-item">
+    <div class="main-line">{{ e['client_name'] or e['client_name_snapshot'] }}{% if e['site_name_snapshot'] %} → {{ e['site_name_snapshot'] }}{% endif %}</div>
+    <div class="sub-line">{{ e['count'] or '?' }}台　{{ e['driver_name'] or (e['subcontractor_name'] + '(傭車)' if e['subcontractor_name'] else '') }}</div>
+  </div>
+  {% else %}
+  <p class="empty-note">本日の配車はまだ登録されていません。</p>
+  {% endfor %}
+  {% if entries %}<p class="empty-note">(以上、{{ entries|length }}件)</p>{% endif %}
+</div>
+
+<form method="post" action="{{ url_for('chairman.raise_today_alert') }}">
+  <button type="submit" class="big-button alert">ちがう気がする（事務員に伝える）</button>
+</form>
+{% if alert %}<p class="empty-note">（{{ alert['raised_at'] }} に伝達済み・対応待ち）</p>{% endif %}
+{% endblock %}

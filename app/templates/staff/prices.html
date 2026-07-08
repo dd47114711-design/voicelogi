@@ -1,0 +1,22 @@
+{% extends "staff/base.html" %}
+{% block title %}単価表{% endblock %}
+{% block content %}
+<h1>単価表</h1>
+<div class="price-list">
+  <div class="price-row price-header">
+    <span>会社名</span><span>区分</span><span>単価</span><span>備考</span><span>適用開始日</span><span>最終更新</span><span></span>
+  </div>
+  {% for p in prices %}
+  <form class="price-row" method="post" action="{{ url_for('prices.update', client_id=p['client_id'], category=p['category']) }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <span>{{ p['client_name'] }}</span>
+    <span>{{ p['category'] }}</span>
+    <span><input type="number" name="amount" value="{{ p['amount'] if p['amount'] is not none else '' }}" style="width:7em"></span>
+    <span><input type="text" name="note" value="{{ p['note'] or '' }}" style="width:12em" class="{{ 'needs-review' if p['note'] and not p['amount'] else '' }}"></span>
+    <span><input type="date" name="effective_date" value="{{ p['effective_date'] or '' }}"></span>
+    <span class="note">{{ p['updated_by'] or '' }} {{ p['updated_at'] or '' }}</span>
+    <span><button type="submit" class="secondary">更新</button></span>
+  </form>
+  {% endfor %}
+</div>
+{% endblock %}

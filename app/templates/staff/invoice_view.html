@@ -1,0 +1,46 @@
+{% extends "staff/base.html" %}
+{% block title %}請求書 #{{ invoice['id'] }}{% endblock %}
+{% block content %}
+<h1>請求書プレビュー — {{ invoice['client_name_snapshot'] }} 御中</h1>
+<p class="note">{{ invoice['period_start'] }} 〜 {{ invoice['period_end'] }}分 / 発行日 {{ invoice['invoice_date'] }}</p>
+
+<table class="grid">
+  <thead><tr><th>日付</th><th>名称</th><th>台数</th><th>数量</th><th>単価</th><th>金額</th><th></th></tr></thead>
+  <tbody>
+    {% for line in lines %}
+    <tr>
+      <td>{{ line['entry_date'] }}</td>
+      <td>{{ line['display_name'] }}</td>
+      <td>{{ line['count'] or '' }}</td>
+      <td>{{ line['quantity'] or '' }}</td>
+      <td>{{ '{:,}'.format(line['unit_price']) if line['unit_price'] else '' }}</td>
+      <td>¥{{ '{:,}'.format(line['amount']) if line['amount'] else '' }}</td>
+      <td>
+        <form class="inline" method="post" action="{{ url_for('invoice.toggle_dash', invoice_id=invoice['id'], line_id=line['id']) }}">
+          <button type="submit" class="secondary">{{ '元に戻す' if line['display_name'] == '〃' else '〃 にする' }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p>
+  税抜合計 ¥{{ '{:,}'.format(invoice['subtotal_amount']) }}
+  消費税({{ (invoice['tax_rate'] * 100)|int }}%) ¥{{ '{:,}'.format(invoice['tax_amount']) }}<br>
+  <strong style="font-size:1.3em">税込合計 ¥{{ '{:,}'.format(invoice['total_amount']) }}</strong><br>
+  発行元 {{ invoice['issuer_name_snapshot'] }} 登録番号: {{ invoice['issuer_registration_number_snapshot'] or '(未設定)' }}
+</p>
+
+<p>
+  {% if invoice['xlsx_path'] %}<a class="btn" href="{{ url_for('invoice.download_xlsx', invoice_id=invoice['id']) }}">印刷する(Excelそのまま)</a>{% endif %}
+  {% if invoice['pdf_path'] %}<a class="btn" href="{{ url_for('invoice.download_pdf', invoice_id=invoice['id']) }}">PDFを作成する(メール添付用)</a>{% endif %}
+</p>
+
+<h2>会長の確認状況</h2>
+{% if reviews %}
+<ul>{% for r in reviews %}<li>{{ r['reviewed_by'] }} が {{ r['reviewed_at'] }} に確認</li>{% endfor %}</ul>
+{% else %}
+<p class="note">まだ会長は確認していません。</p>
+{% endif %}
+{% endblock %}

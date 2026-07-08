@@ -240,8 +240,14 @@ def create_dispatch_entry(conn, entry_date, client_id=None, client_name_snapshot
 
 def list_dispatch_entries(conn, entry_date=None, status=None, client_id=None):
     query = (
-        "SELECT dispatch_entries.*, clients.name AS client_name "
-        "FROM dispatch_entries LEFT JOIN clients ON clients.id = dispatch_entries.client_id "
+        "SELECT dispatch_entries.*, clients.name AS client_name, "
+        "vehicles.plate_no AS vehicle_no, drivers.name AS driver_name, "
+        "subcontractors.name AS subcontractor_name "
+        "FROM dispatch_entries "
+        "LEFT JOIN clients ON clients.id = dispatch_entries.client_id "
+        "LEFT JOIN vehicles ON vehicles.id = dispatch_entries.vehicle_id "
+        "LEFT JOIN drivers ON drivers.id = dispatch_entries.driver_id "
+        "LEFT JOIN subcontractors ON subcontractors.id = dispatch_entries.subcontractor_id "
         "WHERE 1=1"
     )
     params = []
@@ -318,9 +324,11 @@ def _now_localtime(conn):
 def list_billable_entries(conn, client_id, period_start, period_end):
     return conn.execute(
         """
-        SELECT dispatch_entries.*, clients.name AS client_name
+        SELECT dispatch_entries.*, clients.name AS client_name,
+               vehicles.plate_no AS vehicle_no
         FROM dispatch_entries
         JOIN clients ON clients.id = dispatch_entries.client_id
+        LEFT JOIN vehicles ON vehicles.id = dispatch_entries.vehicle_id
         WHERE dispatch_entries.client_id = ?
           AND status = '実績確定'
           AND checked = 1

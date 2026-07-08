@@ -1,0 +1,20 @@
+{% extends "chairman/base.html" %}
+{% block content %}
+<a class="back-link" href="{{ url_for('chairman.top') }}">戻る</a>
+<div class="chairman-title">請求書の確認</div>
+
+{% for inv in invoices %}
+<div class="invoice-card">
+  <div>{{ inv['client_name'] }} 御中</div>
+  <div class="amount">税込合計金額　¥{{ '{:,}'.format(inv['total_amount']) }}</div>
+  <form method="post" action="{{ url_for('chairman.review_invoice', invoice_id=inv['id']) }}">
+    <button type="submit" class="big-button primary">見ました（記録する）</button>
+  </form>
+  <form method="post" action="{{ url_for('chairman.raise_invoice_alert', invoice_id=inv['id']) }}">
+    <button type="submit" class="big-button alert">ちがう気がする（事務員に伝える）</button>
+  </form>
+</div>
+{% else %}
+<p class="empty-note">確認待ちの請求書はありません。</p>
+{% endfor %}
+{% endblock %}

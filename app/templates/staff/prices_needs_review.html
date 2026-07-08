@@ -1,0 +1,21 @@
+{% extends "staff/base.html" %}
+{% block title %}単価 要確認一覧{% endblock %}
+{% block content %}
+<h1>単価 要確認一覧</h1>
+<p class="note">自動判定できなかった単価データです。実際の単価を確認のうえ、単価表画面で金額を入力してください。</p>
+<table class="grid">
+  <thead><tr><th>取引先</th><th>区分</th><th>もとの記録</th><th></th></tr></thead>
+  <tbody>
+    {% for p in prices %}
+    <tr>
+      <td>{{ p['client_name'] }}</td>
+      <td>{{ p['category'] }}</td>
+      <td class="needs-review">{{ p['note'] }}</td>
+      <td><a class="btn secondary" href="{{ url_for('prices.index') }}">単価表で修正</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">要確認の項目はありません。</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

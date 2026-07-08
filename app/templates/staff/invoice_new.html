@@ -1,0 +1,35 @@
+{% extends "staff/base.html" %}
+{% block title %}請求書を作成{% endblock %}
+{% block content %}
+<h1>請求書を作成 — {{ client['name'] }} 御中</h1>
+<p class="note">{{ period_start }} 〜 {{ period_end }} の実績確定・チェック済み・未請求の分</p>
+
+<table class="grid">
+  <thead><tr><th>日付</th><th>台数</th><th>区分</th><th>数量H</th><th>単価</th><th>金額</th></tr></thead>
+  <tbody>
+    {% for e in billable %}
+    <tr>
+      <td>{{ e['entry_date'] }}</td>
+      <td>{{ e['count'] or '' }}</td>
+      <td>{{ e['category'] or '' }}</td>
+      <td>{{ e['quantity'] or '' }}</td>
+      <td>{{ '{:,}'.format(e['unit_price']) if e['unit_price'] else '' }}</td>
+      <td>¥{{ '{:,}'.format(((e['quantity'] or 0) * (e['unit_price'] or 0))|round|int) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">この期間に請求できる実績がありません。</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p><strong>税抜合計 ¥{{ '{:,}'.format(subtotal) }}</strong></p>
+
+{% if billable %}
+<form method="post" action="{{ url_for('invoice.create') }}">
+  <input type="hidden" name="client_id" value="{{ client['id'] }}">
+  <input type="hidden" name="period_start" value="{{ period_start }}">
+  <input type="hidden" name="period_end" value="{{ period_end }}">
+  <button type="submit">この内容で請求書を作成する</button>
+</form>
+{% endif %}
+{% endblock %}

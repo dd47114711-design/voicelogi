@@ -1,0 +1,75 @@
+{% extends "staff/base.html" %}
+{% block title %}マスタ管理{% endblock %}
+{% block content %}
+<h1>マスタ管理</h1>
+
+<div class="card">
+  <h2>自社情報(請求書発行元)</h2>
+  <form method="post" action="{{ url_for('masters.update_company') }}">
+    <p>会社名 <input type="text" name="company_name" value="{{ company['company_name'] if company else '' }}" required></p>
+    <p>登録番号(インボイス制度) <input type="text" name="registration_number" value="{{ company['registration_number'] if company else '' }}" placeholder="T1234567890123"></p>
+    <p>住所 <input type="text" name="address" value="{{ company['address'] if company else '' }}" style="width:24em"></p>
+    <p>電話番号 <input type="text" name="phone" value="{{ company['phone'] if company else '' }}"></p>
+    <p>振込先 <input type="text" name="bank_info" value="{{ company['bank_info'] if company else '' }}" style="width:24em"></p>
+    <button type="submit">保存</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>元請マスタ ({{ clients|length }}社)</h2>
+  <details>
+    <summary>一覧を見る</summary>
+    <ul>{% for c in clients %}<li>{{ c['name'] }}
+      <form class="inline" method="post" action="{{ url_for('masters.deactivate_client', client_id=c['id']) }}" onsubmit="return confirm('削除(非表示に)しますか？');">
+        <button type="submit" class="secondary">削除</button>
+      </form>
+    </li>{% endfor %}</ul>
+  </details>
+  <form method="post" action="{{ url_for('masters.add_client') }}">
+    <input type="text" name="name" placeholder="新しい元請名" required>
+    <button type="submit">追加</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>車両マスタ ({{ vehicles|length }}台)</h2>
+  <ul>{% for v in vehicles %}<li>{{ v['plate_no'] }}({{ v['vehicle_type'] or '' }})
+    <form class="inline" method="post" action="{{ url_for('masters.deactivate_vehicle', vehicle_id=v['id']) }}" onsubmit="return confirm('削除しますか？');">
+      <button type="submit" class="secondary">削除</button>
+    </form>
+  </li>{% endfor %}</ul>
+  <form method="post" action="{{ url_for('masters.add_vehicle') }}">
+    <input type="text" name="plate_no" placeholder="車番(例: 12-34)" required>
+    <input type="text" name="vehicle_type" placeholder="車種">
+    <button type="submit">追加</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>運転手マスタ ({{ drivers|length }}名)</h2>
+  <ul>{% for d in drivers %}<li>{{ d['name'] }}
+    <form class="inline" method="post" action="{{ url_for('masters.deactivate_driver', driver_id=d['id']) }}" onsubmit="return confirm('削除しますか？');">
+      <button type="submit" class="secondary">削除</button>
+    </form>
+  </li>{% endfor %}</ul>
+  <form method="post" action="{{ url_for('masters.add_driver') }}">
+    <input type="text" name="name" placeholder="運転手名" required>
+    <input type="text" name="phone" placeholder="電話番号">
+    <button type="submit">追加</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>傭車マスタ ({{ subcontractors|length }}社)</h2>
+  <ul>{% for s in subcontractors %}<li>{{ s['name'] }}
+    <form class="inline" method="post" action="{{ url_for('masters.deactivate_subcontractor', subcontractor_id=s['id']) }}" onsubmit="return confirm('削除しますか？');">
+      <button type="submit" class="secondary">削除</button>
+    </form>
+  </li>{% endfor %}</ul>
+  <form method="post" action="{{ url_for('masters.add_subcontractor') }}">
+    <input type="text" name="name" placeholder="傭車会社名" required>
+    <input type="text" name="contact" placeholder="連絡先">
+    <button type="submit">追加</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}配車・請求システム(事務員用){% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='staff.css') }}">
+</head>
+<body>
+{% if session.get('staff_name') %}
+<header class="topbar">
+  <a class="brand" href="{{ url_for('home.index') }}">配車・請求システム</a>
+  <nav class="topnav">
+    <a href="{{ url_for('dispatch.grid') }}">配車入力</a>
+    <a href="{{ url_for('billing.index') }}">実績整理</a>
+    <a href="{{ url_for('invoice.closing') }}">月末締め作業</a>
+    <a href="{{ url_for('prices.index') }}">単価表</a>
+    <a href="{{ url_for('masters.index') }}">マスタ管理</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="staff-name">{{ session.get('staff_name') }} さん</span>
+    <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline">
+      <button type="submit" class="link-button">名前を変える</button>
+    </form>
+  </div>
+</header>
+{% endif %}
+<main class="content">
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

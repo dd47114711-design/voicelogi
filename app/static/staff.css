@@ -1,0 +1,119 @@
+/* 事務員用: キーボード操作・高頻度入力を主眼にしたスタイル */
+* { box-sizing: border-box; }
+body {
+  font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #1f2d3d;
+}
+a { color: #1f4e78; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #1f4e78;
+  color: #fff;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+}
+.topbar .brand { color: #fff; font-weight: bold; text-decoration: none; font-size: 1.1em; }
+.topnav { display: flex; gap: 14px; flex-wrap: wrap; }
+.topnav a { color: #d9e6f2; text-decoration: none; font-size: 0.95em; }
+.topnav a:hover { color: #fff; text-decoration: underline; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 0.9em; }
+.link-button { background: none; border: none; color: #d9e6f2; text-decoration: underline; cursor: pointer; font-size: 0.9em; padding: 0; }
+
+.badge-alert {
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 10px;
+  padding: 2px 10px;
+  font-size: 0.85em;
+  margin-left: 8px;
+}
+
+.content { padding: 20px; max-width: 1200px; margin: 0 auto; }
+
+h1 { font-size: 1.4em; margin: 0 0 12px; }
+h2 { font-size: 1.15em; margin: 20px 0 8px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar .spacer { flex: 1; }
+
+table.grid {
+  border-collapse: collapse;
+  width: 100%;
+  background: #fff;
+  font-size: 0.92em;
+}
+table.grid th, table.grid td {
+  border: 1px solid #d0d7de;
+  padding: 4px 6px;
+  text-align: left;
+}
+table.grid th { background: #1f4e78; color: #fff; position: sticky; top: 0; }
+table.grid input, table.grid select {
+  width: 100%;
+  border: 1px solid #c7ccd1;
+  padding: 4px;
+  font-size: 1em;
+}
+table.grid tr.row-blank { background: #fbfcfd; }
+
+.sync-icon { font-size: 0.85em; white-space: nowrap; }
+.sync-ok { color: #27ae60; }
+.sync-pending { color: #999; }
+.sync-error { color: #e74c3c; font-weight: bold; }
+
+button, .btn {
+  background: #2e86c1;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95em;
+  text-decoration: none;
+  display: inline-block;
+}
+button.secondary, .btn.secondary { background: #7f8c8d; }
+button.danger, .btn.danger { background: #c0392b; }
+button:disabled { background: #b0b8bf; cursor: not-allowed; }
+
+.card {
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.note { color: #808080; font-size: 0.85em; }
+
+.needs-review { color: #c0392b; font-weight: bold; }
+
+.price-list { background: #fff; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; }
+.price-row {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1fr 1.6fr 1.2fr 1.6fr 0.8fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e9ed;
+  margin: 0;
+}
+.price-header { background: #1f4e78; color: #fff; font-weight: bold; }
+
+form.inline { display: inline; }
+
+.login-wrap {
+  max-width: 480px;
+  margin: 80px auto;
+  text-align: center;
+}
+.login-wrap h1 { font-size: 1.3em; margin-bottom: 20px; }
+.name-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 16px; }
+.name-grid button { font-size: 1.1em; padding: 14px 24px; }
+.name-grid button.recent { background: #27ae60; }
+.error-text { color: #c0392b; }
