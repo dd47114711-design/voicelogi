@@ -6,11 +6,11 @@
 <div class="card">
   <h2>自社情報(請求書発行元)</h2>
   <form method="post" action="{{ url_for('masters.update_company') }}">
-    <p>会社名 <input type="text" name="company_name" value="{{ company['company_name'] if company else '' }}" required></p>
-    <p>登録番号(インボイス制度) <input type="text" name="registration_number" value="{{ company['registration_number'] if company else '' }}" placeholder="T1234567890123"></p>
-    <p>住所 <input type="text" name="address" value="{{ company['address'] if company else '' }}" style="width:24em"></p>
-    <p>電話番号 <input type="text" name="phone" value="{{ company['phone'] if company else '' }}"></p>
-    <p>振込先 <input type="text" name="bank_info" value="{{ company['bank_info'] if company else '' }}" style="width:24em"></p>
+    <p>会社名 <input type="text" name="company_name" value="{{ (company['company_name'] if company else None) or '' }}" required></p>
+    <p>登録番号(インボイス制度) <input type="text" name="registration_number" value="{{ (company['registration_number'] if company else None) or '' }}" placeholder="T1234567890123"></p>
+    <p>住所 <input type="text" name="address" value="{{ (company['address'] if company else None) or '' }}" style="width:24em"></p>
+    <p>電話番号 <input type="text" name="phone" value="{{ (company['phone'] if company else None) or '' }}"></p>
+    <p>振込先 <input type="text" name="bank_info" value="{{ (company['bank_info'] if company else None) or '' }}" style="width:24em"></p>
     <button type="submit">保存</button>
   </form>
 </div>
