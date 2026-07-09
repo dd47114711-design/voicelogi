@@ -105,16 +105,34 @@
     }
   }
 
+  function renderDateCandidate() {
+    var box = document.getElementById("draft-date-candidate");
+    box.innerHTML = "";
+    var dateInput = document.getElementById("dispatch-date");
+    if (!draft.dispatch_date_candidate || draft.dispatch_date_candidate === dateInput.value) return;
+    box.appendChild(document.createTextNode("テキストから読み取った日付: " + draft.dispatch_date_candidate + " "));
+    var applyBtn = el("button", { type: "button", class: "secondary" }, "この日付にする");
+    applyBtn.addEventListener("click", function () {
+      dateInput.value = draft.dispatch_date_candidate;
+      box.innerHTML = "";
+    });
+    box.appendChild(applyBtn);
+  }
+
   function renderDraft(data) {
     draft = data;
     document.getElementById("draft-card").style.display = "";
     renderWarnings(draft.warnings);
+    renderDateCandidate();
     renderClientSite();
     document.getElementById("draft-total").textContent = draft.total_trucks !== null ? draft.total_trucks + "台" : "(抽出できませんでした)";
     document.getElementById("draft-time").textContent = draft.start_time || "(抽出できませんでした)";
     renderOwnVehicles();
     renderSubcontractors();
     document.getElementById("commit-messages").innerHTML = "";
+    var commitBtn = document.getElementById("commit-btn");
+    commitBtn.disabled = false;
+    commitBtn.textContent = "登録";
   }
 
   function collectCommitPayload() {
@@ -160,6 +178,11 @@
     });
 
     document.getElementById("commit-btn").addEventListener("click", function () {
+      var btn = this;
+      // 二重登録防止: 処理完了(成功時は画面遷移、失敗時は再度押せるようにする)まで
+      // ボタンを無効化する。成功時はリダイレクトするので再度押される心配はない。
+      btn.disabled = true;
+      btn.textContent = "登録中...";
       var payload = collectCommitPayload();
       fetch(CONF.commitUrl, {
         method: "POST",
@@ -168,18 +191,24 @@
       })
         .then(function (res) { return res.json().then(function (data) { return { status: res.status, data: data }; }); })
         .then(function (result) {
-          var box = document.getElementById("commit-messages");
-          box.innerHTML = "";
           if (result.status === 200 && result.data.ok) {
             window.location.href = CONF.gridUrlTemplate + "?date=" + encodeURIComponent(payload.dispatch_date);
             return;
           }
+          btn.disabled = false;
+          btn.textContent = "登録";
+          var box = document.getElementById("commit-messages");
+          box.innerHTML = "";
           var ul = document.createElement("ul");
           ul.className = "needs-review";
           (result.data.messages || ["登録に失敗しました"]).forEach(function (m) {
             ul.appendChild(el("li", null, m));
           });
           box.appendChild(ul);
+        })
+        .catch(function () {
+          btn.disabled = false;
+          btn.textContent = "登録";
         });
     });
   });

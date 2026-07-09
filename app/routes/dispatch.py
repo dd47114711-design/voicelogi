@@ -230,6 +230,18 @@ def voice_commit():
     if not site_id:
         errors.append("現場が未確定です")
 
+    # own_vehicles/subcontractors に含まれる項目は、未確定(idなし)のまま送られてきたら
+    # 静かに無視せずエラーにする(下書き画面のフロント側は未確定の行を送信しない設計だが、
+    # サーバー側でも「未確定のまま登録しようとした」ことを検知できるようにしておく)。
+    for i, v in enumerate(own_vehicles, start=1):
+        if not v.get("id"):
+            errors.append(f"自社車両({i}件目)が未確定のまま登録しようとしました")
+    for i, s in enumerate(subcontractors, start=1):
+        if not s.get("id"):
+            errors.append(f"傭車({i}件目)が未確定のまま登録しようとしました")
+        elif not s.get("count"):
+            errors.append(f"傭車({i}件目)の台数が未入力です")
+
     resolved_vehicles = [v for v in own_vehicles if v.get("id")]
     resolved_subs = [s for s in subcontractors if s.get("id") and s.get("count")]
     if not resolved_vehicles and not resolved_subs:

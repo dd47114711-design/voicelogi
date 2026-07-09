@@ -219,7 +219,8 @@ def main():
     check("傭車4社を抽出できる", len(draft["subcontractors"]) == 4)
     check("傭車が全て傭車マスタに一致する", all(s["matched"] for s in draft["subcontractors"]))
     check("傭車の合計台数が9(2+2+4+1)", sum(s["count"] for s in draft["subcontractors"]) == 9)
-    check("13(4自社+9傭車) != 16申告 の警告が出る", any("食い違い" in w for w in draft["warnings"]))
+    check("13(4自社+9傭車) != 16申告 で「3台不足」の警告が出る", any("3台不足" in w for w in draft["warnings"]))
+    check("日付候補が明日(2026-07-10)として抽出される", draft["dispatch_date_candidate"] == "2026-07-10")
 
     commit_payload = {
         "dispatch_date": "2026-07-10",
@@ -264,6 +265,33 @@ def main():
     )
     check("未確定のままcommitすると400で拒否される", r3.status_code == 400)
     check("エラーメッセージに元請未確定が含まれる", "元請が未確定です" in r3.get_json()["messages"])
+
+    # 自社車両・傭車が「未確定のまま(idなし)」送られてきた場合は静かに無視せず400で拒否する
+    r4 = client.post("/dispatch/voice/commit", json={
+        "dispatch_date": "2026-07-10",
+        "client": {"id": kaida_client["id"]},
+        "site": {"id": site_eijun_id},
+        "own_vehicles": [{"id": None}],
+        "subcontractors": [],
+    })
+    check("未確定の自社車両を含むcommitは400で拒否される", r4.status_code == 400)
+    check(
+        "エラーメッセージに自社車両未確定が含まれる",
+        any("自社車両" in m and "未確定" in m for m in r4.get_json()["messages"]),
+    )
+
+    r5 = client.post("/dispatch/voice/commit", json={
+        "dispatch_date": "2026-07-10",
+        "client": {"id": kaida_client["id"]},
+        "site": {"id": site_eijun_id},
+        "own_vehicles": [],
+        "subcontractors": [{"id": sub_ids["坂本"], "count": 0}],
+    })
+    check("台数0の傭車を含むcommitは400で拒否される", r5.status_code == 400)
+    check(
+        "エラーメッセージに傭車の台数未入力が含まれる",
+        any("傭車" in m and "台数" in m for m in r5.get_json()["messages"]),
+    )
 
     conn.close()
     print("\n全項目OK")

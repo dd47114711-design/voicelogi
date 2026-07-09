@@ -10,15 +10,24 @@
 - Flaskに依存しない純粋関数群(conn + 素の引数を受け取りdict/listを返す)。
   ルート層(app/routes/dispatch.py)から呼ばれる。
 """
+import datetime
 import re
 
 from . import models
 
 _HEADER_RE = re.compile(r"^(?P<client>[^、,]+)[、,]\s*(?P<site>[^に]+?)に\s*(?P<total>\d+)\s*台")
 # ヘッダー文の先頭に付く日付語(「明日、カイダ建設、...」の「明日」)は元請名として
-# 誤抽出しないよう先に取り除く。日付そのものは画面の日付入力欄が正とするため、
-# ここでは読み飛ばすだけで別途パースしない。
-_LEADING_DATE_RE = re.compile(r"^(今日|明日|明後日|昨日|\d{1,2}月\d{1,2}日)[、,]\s*")
+# 誤抽出しないよう先に取り除く。相対語(今日/明日/明後日/昨日)・「M月D日」・
+# 「M/D」・「YYYY-MM-DD」のいずれにも対応する。
+_LEADING_DATE_RE = re.compile(
+    r"^(今日|明日|明後日|昨日|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}|\d{1,2}月\d{1,2}日)[、,]\s*"
+)
+# 日付候補抽出用(テキスト中のどこにあってもよい)。画面の日付入力欄は別に存在するため、
+# ここでの抽出結果はあくまで「候補」であり、dispatch_dateを上書きすることはしない。
+_RELATIVE_DATE_WORDS = (("明後日", 2), ("明日", 1), ("昨日", -1), ("今日", 0))
+_ABS_DATE_ISO_RE = re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})")
+_ABS_DATE_MD_KANJI_RE = re.compile(r"(\d{1,2})月(\d{1,2})日")
+_ABS_DATE_MD_SLASH_RE = re.compile(r"(\d{1,2})/(\d{1,2})(?!\d)")
 _OWN_VEHICLE_KEYWORDS = ("自社",)
 _TIME_KEYWORDS = ("時間",)
 _HEADER_HINT_RE = re.compile(r"[、,].*に\s*\d+\s*台")
@@ -110,6 +119,41 @@ def extract_subcontractor_tokens(sentence):
     return _SUBCONTRACTOR_TOKEN_RE.findall(sentence)
 
 
+def extract_date_candidate(text, today=None):
+    """テキスト全体から日付表現(相対語・M月D日・M/D・YYYY-MM-DD)を1つ探し、
+    ISO形式(YYYY-MM-DD)の候補として返す。見つからなければNone。
+    画面の日付入力欄が正であり、これはあくまで候補の提示に使う。"""
+    today = today or datetime.date.today()
+    text = text or ""
+
+    for word, offset in _RELATIVE_DATE_WORDS:
+        if word in text:
+            return (today + datetime.timedelta(days=offset)).isoformat()
+
+    m = _ABS_DATE_ISO_RE.search(text)
+    if m:
+        try:
+            return datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+        except ValueError:
+            pass
+
+    m = _ABS_DATE_MD_KANJI_RE.search(text)
+    if m:
+        try:
+            return datetime.date(today.year, int(m.group(1)), int(m.group(2))).isoformat()
+        except ValueError:
+            pass
+
+    m = _ABS_DATE_MD_SLASH_RE.search(text)
+    if m:
+        try:
+            return datetime.date(today.year, int(m.group(1)), int(m.group(2))).isoformat()
+        except ValueError:
+            pass
+
+    return None
+
+
 def extract_start_time(sentence):
     for pattern, extractor in _TIME_PATTERNS:
         m = pattern.search(sentence)
@@ -128,6 +172,7 @@ def parse_transcript(conn, dispatch_date, text):
 
     result = {
         "dispatch_date": dispatch_date,
+        "dispatch_date_candidate": extract_date_candidate(text),
         "client": {"matched": False, "raw_text": None, "candidates": []},
         "site": {"matched": False, "raw_text": None, "candidates": []},
         "total_trucks": None,
@@ -175,11 +220,17 @@ def parse_transcript(conn, dispatch_date, text):
 
     extracted_total = len(result["own_vehicles"]) + sum(x["count"] for x in result["subcontractors"])
     if result["total_trucks"] is not None and extracted_total != result["total_trucks"]:
-        sub_total = sum(x["count"] for x in result["subcontractors"])
-        warnings.append(
-            f"台数の食い違い: 申告合計{result['total_trucks']}台 に対し、"
-            f"自社{len(result['own_vehicles'])}台+傭車{sub_total}台={extracted_total}台"
-        )
+        diff = result["total_trucks"] - extracted_total
+        if diff > 0:
+            warnings.append(
+                f"必要台数{result['total_trucks']}台に対して、抽出台数は{extracted_total}台です。"
+                f"{diff}台不足しています。"
+            )
+        else:
+            warnings.append(
+                f"必要台数{result['total_trucks']}台に対して、抽出台数は{extracted_total}台です。"
+                f"{-diff}台超過しています。"
+            )
 
     if not result["client"]["matched"]:
         warnings.append("元請を特定できませんでした(候補から選択してください)")
