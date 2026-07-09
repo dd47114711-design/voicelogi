@@ -444,10 +444,9 @@ def list_invoices(conn, only_unreviewed=False):
     return conn.execute(query).fetchall()
 
 
-def list_billing_summary(conn, period_start, period_end):
+def list_billing_summary(conn, period_start, period_end, only_unbilled=False):
     """月末締め作業画面用: 取引先ごとの未請求(実績確定・チェック済・未請求)件数を集計する。"""
-    return conn.execute(
-        """
+    query = """
         SELECT clients.id AS client_id, clients.name AS client_name,
                COUNT(dispatch_entries.id) AS unbilled_count
         FROM clients
@@ -458,10 +457,11 @@ def list_billing_summary(conn, period_start, period_end):
             AND dispatch_entries.entry_date BETWEEN ? AND ?
         WHERE clients.is_active = 1
         GROUP BY clients.id
-        ORDER BY unbilled_count DESC, clients.name
-        """,
-        (period_start, period_end),
-    ).fetchall()
+    """
+    if only_unbilled:
+        query += " HAVING unbilled_count > 0"
+    query += " ORDER BY unbilled_count DESC, clients.name"
+    return conn.execute(query, (period_start, period_end)).fetchall()
 
 
 # ---------- 会長の「見ました」記録(追記専用ログ + invoices側キャッシュ更新) ----------

@@ -25,11 +25,12 @@ def closing():
     today = datetime.date.today()
     period_start = request.args.get("period_start") or today.replace(day=1).isoformat()
     period_end = request.args.get("period_end") or today.isoformat()
-    summary = models.list_billing_summary(g.db, period_start, period_end)
+    hide_zero = request.args.get("hide_zero", "1") == "1"
+    summary = models.list_billing_summary(g.db, period_start, period_end, only_unbilled=hide_zero)
     recent_invoices = models.list_invoices(g.db)[:20]
     return render_template(
         "staff/invoice_closing.html", summary=summary, period_start=period_start,
-        period_end=period_end, recent_invoices=recent_invoices,
+        period_end=period_end, recent_invoices=recent_invoices, hide_zero=hide_zero,
     )
 
 

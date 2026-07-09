@@ -5,6 +5,11 @@
 <form method="get" class="toolbar">
   <label>対象期間 <input type="date" name="period_start" value="{{ period_start }}"></label>
   〜 <input type="date" name="period_end" value="{{ period_end }}">
+  <label>
+    <input type="hidden" name="hide_zero" value="0">
+    <input type="checkbox" name="hide_zero" value="1" {% if hide_zero %}checked{% endif %} onchange="this.form.submit()">
+    未請求ありのみ表示
+  </label>
   <button type="submit" class="secondary">表示</button>
 </form>
 
