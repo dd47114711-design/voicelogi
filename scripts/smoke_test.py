@@ -190,6 +190,81 @@ def main():
     r = client.get("/")
     check("事務員トップに会長からの連絡バッジが表示される", "会長からの連絡".encode() in r.data)
 
+    # 音声配車入力: マスタ未整備を想定した準備(sites/vehicles/subcontractorsは初期状態で
+    # 空のため、ここで明示的に必要な行だけ作る)
+    kaida_client = next(c for c in models.list_clients(conn) if "カイダ建設" in c["name"])
+    site_eijun_id = models.create_site(conn, "永順", client_id=kaida_client["id"])
+    veh_ids = {n: models.create_vehicle(conn, n) for n in ["1", "12", "15", "19"]}
+    sub_ids = {n: models.create_subcontractor(conn, n) for n in ["坂本", "山田", "久富", "松尾"]}
+
+    r = client.get("/dispatch/voice")
+    check("音声配車入力画面が開く", r.status_code == 200 and "音声配車入力".encode() in r.data)
+
+    voice_text = (
+        "明日、カイダ建設、永順に16台。\n自社は1番、12番、15番、19番。\n"
+        "坂本2台、山田2台、久富4台、松尾1台。\n時間は7時半。"
+    )
+    r = client.post("/dispatch/voice/parse", json={"dispatch_date": "2026-07-10", "text": voice_text})
+    check("音声配車の下書き作成APIが200を返す", r.status_code == 200)
+    draft = r.get_json()
+    check("元請がカイダ建設㈱に一致する", draft["client"]["matched"] and draft["client"]["id"] == kaida_client["id"])
+    check(
+        "現場が永順に一致する(永順産業㈱には誤爆しない)",
+        draft["site"]["matched"] and draft["site"]["id"] == site_eijun_id,
+    )
+    check("申告台数16台を抽出できる", draft["total_trucks"] == 16)
+    check("時間7時半 -> 07:30を抽出できる", draft["start_time"] == "07:30")
+    check("自社車両4台を抽出できる", len(draft["own_vehicles"]) == 4)
+    check("自社車両が全て車両マスタに一致する", all(v["matched"] for v in draft["own_vehicles"]))
+    check("傭車4社を抽出できる", len(draft["subcontractors"]) == 4)
+    check("傭車が全て傭車マスタに一致する", all(s["matched"] for s in draft["subcontractors"]))
+    check("傭車の合計台数が9(2+2+4+1)", sum(s["count"] for s in draft["subcontractors"]) == 9)
+    check("13(4自社+9傭車) != 16申告 の警告が出る", any("食い違い" in w for w in draft["warnings"]))
+
+    commit_payload = {
+        "dispatch_date": "2026-07-10",
+        "client": {"id": kaida_client["id"]},
+        "site": {"id": site_eijun_id},
+        "start_time": draft["start_time"],
+        "own_vehicles": [{"id": v["id"]} for v in draft["own_vehicles"]],
+        "subcontractors": [{"id": s["id"], "count": s["count"]} for s in draft["subcontractors"]],
+    }
+    r = client.post("/dispatch/voice/commit", json=commit_payload)
+    check("音声配車の登録APIが200を返す", r.status_code == 200 and r.get_json()["ok"])
+    check("8行(自社4+傭車4)が作成される", r.get_json()["count"] == 8)
+
+    committed = models.list_dispatch_entries(conn, entry_date="2026-07-10")
+    own_rows = [e for e in committed if e["is_subcontractor"] == 0 and e["vehicle_id"] is not None]
+    sub_rows = [e for e in committed if e["is_subcontractor"] == 1]
+    check("自社行が4件、それぞれcount=1", len(own_rows) == 4 and all(e["count"] == 1 for e in own_rows))
+    check("傭車行が4件、台数合計9", len(sub_rows) == 4 and sum(e["count"] for e in sub_rows) == 9)
+    check("自社行の車両IDが1/12/15/19と一致", {e["vehicle_id"] for e in own_rows} == set(veh_ids.values()))
+    check(
+        "全行がカイダ建設㈱・永順に紐づく",
+        all(e["client_id"] == kaida_client["id"] and e["site_id"] == site_eijun_id for e in committed),
+    )
+    check("memo欄に配車時刻が追記される", all(e["memo"] == "配車時刻 07:30" for e in committed))
+
+    r2 = client.post(
+        "/dispatch/voice/parse",
+        json={"dispatch_date": "2026-07-11", "text": "明日、未登録商事、未登録現場に5台。\n自社は99番。\n時間は9時。"},
+    )
+    check("未知の元請・現場・車番でも200を返す(クラッシュしない)", r2.status_code == 200)
+    draft2 = r2.get_json()
+    check(
+        "未知の元請はmatched:falseでraw_textを保持する",
+        draft2["client"]["matched"] is False and draft2["client"]["raw_text"] == "未登録商事",
+    )
+    check("未知の現場はmatched:falseで、clientsテーブルには誤爆しない", draft2["site"]["matched"] is False)
+    check("未知の車番はmatched:falseで一覧に残る", len(draft2["own_vehicles"]) == 1 and draft2["own_vehicles"][0]["matched"] is False)
+
+    r3 = client.post(
+        "/dispatch/voice/commit",
+        json={"dispatch_date": "2026-07-11", "client": {}, "site": {}, "own_vehicles": [], "subcontractors": []},
+    )
+    check("未確定のままcommitすると400で拒否される", r3.status_code == 400)
+    check("エラーメッセージに元請未確定が含まれる", "元請が未確定です" in r3.get_json()["messages"])
+
     conn.close()
     print("\n全項目OK")
 

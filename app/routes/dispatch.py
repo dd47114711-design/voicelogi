@@ -16,7 +16,7 @@ import tempfile
 
 from flask import Blueprint, g, jsonify, redirect, render_template, request, send_file, url_for
 
-from .. import models
+from .. import models, voice_parse
 from ..auth import login_required
 from ..export import excel_export
 
@@ -187,6 +187,88 @@ def print_day():
     os.close(fd)
     wb.save(path)
     return send_file(path, as_attachment=False, download_name=f"配車表_{date_str}.xlsx")
+
+
+@bp.route("/voice")
+@login_required
+def voice_entry():
+    date_str = request.args.get("date") or datetime.date.today().isoformat()
+    masters = _masters(g.db)
+    # 未確定項目をプルダウンで手動解決できるようにするため、テンプレート/JS両方から
+    # 参照できる形(dictのリスト)で渡す。
+    masters = {k: [dict(row) for row in v] for k, v in masters.items()}
+    return render_template("staff/voice_dispatch.html", date_str=date_str, **masters)
+
+
+@bp.route("/voice/parse", methods=["POST"])
+@login_required
+def voice_parse_draft():
+    payload = request.get_json(silent=True) or {}
+    dispatch_date = payload.get("dispatch_date") or datetime.date.today().isoformat()
+    text = payload.get("text") or ""
+    result = voice_parse.parse_transcript(g.db, dispatch_date, text)
+    return jsonify(result)
+
+
+@bp.route("/voice/commit", methods=["POST"])
+@login_required
+def voice_commit():
+    payload = request.get_json(silent=True) or {}
+    entry_date = payload.get("dispatch_date") or datetime.date.today().isoformat()
+    client = payload.get("client") or {}
+    site = payload.get("site") or {}
+    start_time = payload.get("start_time") or None
+    own_vehicles = payload.get("own_vehicles") or []
+    subcontractors = payload.get("subcontractors") or []
+
+    client_id = client.get("id")
+    site_id = site.get("id")
+
+    errors = []
+    if not client_id:
+        errors.append("元請が未確定です")
+    if not site_id:
+        errors.append("現場が未確定です")
+
+    resolved_vehicles = [v for v in own_vehicles if v.get("id")]
+    resolved_subs = [s for s in subcontractors if s.get("id") and s.get("count")]
+    if not resolved_vehicles and not resolved_subs:
+        errors.append("自社車両・傭車のいずれも確定されていません(最低1台必要)")
+
+    client_row = models.get_client(g.db, client_id) if client_id else None
+    site_row = models.get_site(g.db, site_id) if site_id else None
+    if client_id and not client_row:
+        errors.append("指定された元請が見つかりません")
+    if site_id and not site_row:
+        errors.append("指定された現場が見つかりません")
+    if site_row and client_id and site_row["client_id"] is not None and site_row["client_id"] != client_id:
+        errors.append("選択した現場は別の元請に紐づいています")
+
+    if errors:
+        return jsonify({"error": "validation_failed", "messages": errors}), 400
+
+    memo = f"配車時刻 {start_time}" if start_time else None
+    created_ids = []
+
+    for v in resolved_vehicles:
+        created_ids.append(models.create_dispatch_entry(
+            g.db, entry_date,
+            client_id=client_id, client_name_snapshot=client_row["name"],
+            site_id=site_id, site_name_snapshot=site_row["name"],
+            count=1, vehicle_id=v["id"], is_subcontractor=0, memo=memo,
+        ))
+
+    for s in resolved_subs:
+        sub_row = models.get_subcontractor(g.db, s["id"])
+        created_ids.append(models.create_dispatch_entry(
+            g.db, entry_date,
+            client_id=client_id, client_name_snapshot=client_row["name"],
+            site_id=site_id, site_name_snapshot=site_row["name"],
+            count=s["count"], is_subcontractor=1, subcontractor_id=s["id"],
+            subcontractor_name_snapshot=sub_row["name"] if sub_row else None, memo=memo,
+        ))
+
+    return jsonify({"ok": True, "created_ids": created_ids, "count": len(created_ids)})
 
 
 @bp.route("/search")

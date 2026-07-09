@@ -160,6 +160,10 @@ def list_subcontractors(conn, include_inactive=False):
     return conn.execute("SELECT * FROM subcontractors WHERE is_active = 1 ORDER BY name").fetchall()
 
 
+def get_subcontractor(conn, subcontractor_id):
+    return conn.execute("SELECT * FROM subcontractors WHERE id = ?", (subcontractor_id,)).fetchone()
+
+
 def create_subcontractor(conn, name, contact=None, note=None):
     cur = conn.execute(
         "INSERT INTO subcontractors (name, contact, note) VALUES (?, ?, ?)", (name, contact, note)

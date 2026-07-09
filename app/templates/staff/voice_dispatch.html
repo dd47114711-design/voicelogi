@@ -1,0 +1,70 @@
+{% extends "staff/base.html" %}
+{% block title %}音声配車入力{% endblock %}
+{% block content %}
+<h1>音声配車入力</h1>
+<p class="note">
+  スマホ等で音声文字起こしした配車指示のテキストを貼り付けると、下書きを自動作成します。
+  聞き間違い・表記ゆれがあるため、必ず内容を確認してから登録してください。
+  マスタにない元請・現場・車両・傭車は自動登録されません。先に「マスタ管理」で登録してから、もう一度「下書き作成」をやり直してください。
+</p>
+
+<div class="card">
+  <p>
+    <label>配車日 <input type="date" id="dispatch-date" value="{{ date_str }}"></label>
+  </p>
+  <p>
+    <textarea id="transcript-text" rows="6" style="width:100%;max-width:640px;" placeholder="例: 明日、カイダ建設、永順に16台。自社は1番、12番、15番、19番。坂本2台、山田2台、久富4台、松尾1台。時間は7時半。"></textarea>
+  </p>
+  <button type="button" id="parse-btn">下書き作成</button>
+</div>
+
+<div class="card" id="draft-card" style="display:none;">
+  <h2>下書き</h2>
+  <div id="draft-warnings"></div>
+
+  <table class="grid">
+    <tbody>
+      <tr>
+        <th style="width:8em">元請</th>
+        <td id="draft-client"></td>
+      </tr>
+      <tr>
+        <th>現場</th>
+        <td id="draft-site"></td>
+      </tr>
+      <tr>
+        <th>申告台数</th>
+        <td id="draft-total"></td>
+      </tr>
+      <tr>
+        <th>時間</th>
+        <td id="draft-time"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>自社車両</h3>
+  <table class="grid"><tbody id="draft-own-vehicles"></tbody></table>
+
+  <h3>傭車</h3>
+  <table class="grid"><tbody id="draft-subcontractors"></tbody></table>
+
+  <p><button type="button" id="commit-btn">登録</button></p>
+  <div id="commit-messages"></div>
+</div>
+
+<script>
+window.VOICE_CONF = {
+  parseUrl: "{{ url_for('dispatch.voice_parse_draft') }}",
+  commitUrl: "{{ url_for('dispatch.voice_commit') }}",
+  gridUrlTemplate: "{{ url_for('dispatch.grid') }}",
+  masters: {
+    clients: {{ clients | tojson }},
+    sites: {{ sites | tojson }},
+    vehicles: {{ vehicles | tojson }},
+    subcontractors: {{ subcontractors | tojson }},
+  },
+};
+</script>
+<script src="{{ url_for('static', filename='voice_dispatch.js') }}"></script>
+{% endblock %}
