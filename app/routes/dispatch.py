@@ -23,7 +23,7 @@ from ..export import excel_export
 bp = Blueprint("dispatch", __name__, url_prefix="/dispatch")
 
 _UPDATABLE_FIELDS = (
-    "client_id", "site_name_snapshot", "count", "vehicle_id", "driver_id",
+    "client_id", "site_id", "count", "vehicle_id", "driver_id",
     "is_subcontractor", "subcontractor_id", "memo",
 )
 
@@ -35,6 +35,7 @@ def _is_blank(entry):
 def _masters(conn):
     return {
         "clients": models.list_clients(conn),
+        "sites": models.list_sites(conn),
         "vehicles": models.list_vehicles(conn),
         "drivers": models.list_drivers(conn),
         "subcontractors": models.list_subcontractors(conn),
@@ -60,6 +61,12 @@ def grid():
         models.create_dispatch_entry(g.db, date_str)
         entries = models.list_dispatch_entries(g.db, entry_date=date_str)
 
+    masters = _masters(g.db)
+    # sites はJS側(dispatch.js)にJSONとして埋め込んで元請変更時のクライアント側
+    # フィルタに使うため、sqlite3.Rowのままだと tojson でシリアライズできない。
+    # dictのリストに変換しておく(Jinjaループでの参照方法は変わらない)。
+    masters["sites"] = [dict(s) for s in masters["sites"]]
+
     return render_template(
         "staff/dispatch_grid.html",
         entries=entries,
@@ -67,7 +74,7 @@ def grid():
         date_str=date_str,
         prev_date=(day - datetime.timedelta(days=1)).isoformat(),
         next_date=(day + datetime.timedelta(days=1)).isoformat(),
-        **_masters(g.db),
+        **masters,
     )
 
 
@@ -89,7 +96,7 @@ def duplicate_entry(entry_id):
     new_id = models.create_dispatch_entry(
         g.db, src["entry_date"], client_id=src["client_id"],
         client_name_snapshot=src["client_name_snapshot"],
-        site_name_snapshot=src["site_name_snapshot"], count=src["count"],
+        site_id=src["site_id"], site_name_snapshot=src["site_name_snapshot"], count=src["count"],
         vehicle_id=src["vehicle_id"], driver_id=src["driver_id"],
         is_subcontractor=src["is_subcontractor"], subcontractor_id=src["subcontractor_id"],
         subcontractor_name_snapshot=src["subcontractor_name_snapshot"], memo=src["memo"],
@@ -113,7 +120,7 @@ def update_entry(entry_id):
     for key, value in fields.items():
         if value == "":
             clean[key] = None
-        elif key in ("client_id", "vehicle_id", "driver_id", "subcontractor_id", "count"):
+        elif key in ("client_id", "site_id", "vehicle_id", "driver_id", "subcontractor_id", "count"):
             clean[key] = int(value) if value is not None else None
         elif key == "is_subcontractor":
             clean[key] = 1 if value else 0
@@ -123,6 +130,10 @@ def update_entry(entry_id):
     if "client_id" in clean:
         client = models.get_client(g.db, clean["client_id"]) if clean["client_id"] else None
         clean["client_name_snapshot"] = client["name"] if client else None
+
+    if "site_id" in clean:
+        site = models.get_site(g.db, clean["site_id"]) if clean["site_id"] else None
+        clean["site_name_snapshot"] = site["name"] if site else None
 
     try:
         models.update_dispatch_entry(g.db, entry_id, expected_version=expected_version, **clean)
@@ -159,7 +170,7 @@ def copy_previous_day():
     for e in prev_entries:
         models.create_dispatch_entry(
             g.db, day.isoformat(), client_id=e["client_id"], client_name_snapshot=e["client_name_snapshot"],
-            site_name_snapshot=e["site_name_snapshot"], count=e["count"], vehicle_id=e["vehicle_id"],
+            site_id=e["site_id"], site_name_snapshot=e["site_name_snapshot"], count=e["count"], vehicle_id=e["vehicle_id"],
             driver_id=e["driver_id"], is_subcontractor=e["is_subcontractor"],
             subcontractor_id=e["subcontractor_id"], subcontractor_name_snapshot=e["subcontractor_name_snapshot"],
             memo=e["memo"],

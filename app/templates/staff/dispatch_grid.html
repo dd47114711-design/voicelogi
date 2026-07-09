@@ -24,10 +24,6 @@
   <a class="btn secondary" href="{{ url_for('dispatch.print_day', date=date_str) }}" target="_blank">印刷(紙の配車表)</a>
 </div>
 
-<datalist id="site-name-options">
-  {% for e in entries %}{% if e['site_name_snapshot'] %}<option value="{{ e['site_name_snapshot'] }}">{% endif %}{% endfor %}
-</datalist>
-
 <table class="grid" id="dispatch-table" data-entry-date="{{ date_str }}">
   <thead>
     <tr>
@@ -36,7 +32,7 @@
   </thead>
   <tbody id="dispatch-tbody">
     {% for entry in entries %}
-      {{ row_macro.render_row(entry, clients, vehicles, drivers, subcontractors) }}
+      {{ row_macro.render_row(entry, clients, sites, vehicles, drivers, subcontractors) }}
     {% endfor %}
   </tbody>
 </table>
@@ -54,6 +50,7 @@ window.VOICELOGI = {
   duplicateUrlTemplate: "{{ url_for('dispatch.duplicate_entry', entry_id=0) }}",
   deleteUrlTemplate: "{{ url_for('dispatch.delete_entry', entry_id=0) }}",
   quickAddUrlTemplate: "{{ url_for('masters.quick_add', entity='ENTITY') }}",
+  sites: {{ sites | tojson }},
 };
 </script>
 <script src="{{ url_for('static', filename='dispatch.js') }}"></script>

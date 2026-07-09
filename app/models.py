@@ -66,12 +66,35 @@ def list_sites(conn, client_id=None, include_inactive=False):
     return conn.execute(query, params).fetchall()
 
 
+def get_site(conn, site_id):
+    return conn.execute("SELECT * FROM sites WHERE id = ?", (site_id,)).fetchone()
+
+
 def create_site(conn, name, client_id=None, note=None):
     cur = conn.execute(
         "INSERT INTO sites (name, client_id, note) VALUES (?, ?, ?)", (name, client_id, note)
     )
     conn.commit()
     return cur.lastrowid
+
+
+def get_or_create_site(conn, name, client_id=None, note=None):
+    """既存なら再利用、なければ作成する冪等な取得関数。
+
+    sites.client_id は NULL(元請未設定の現場)を許容するが、SQLiteの
+    UNIQUE(name, client_id) 制約はNULL同士を「別物」として扱うため、
+    get_or_create_clientと同じ INSERT OR IGNORE パターンをそのまま使うと
+    元請未設定の同名現場が重複作成されてしまう。client_id IS NULL の場合を
+    明示的に分岐してSELECTすることでこれを避ける。"""
+    if client_id is None:
+        row = conn.execute(
+            "SELECT id FROM sites WHERE name = ? AND client_id IS NULL", (name,)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT id FROM sites WHERE name = ? AND client_id = ?", (name, client_id)
+        ).fetchone()
+    return row["id"] if row else create_site(conn, name, client_id=client_id, note=note)
 
 
 def deactivate_site(conn, site_id):

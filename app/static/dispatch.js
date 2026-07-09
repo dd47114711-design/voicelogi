@@ -137,24 +137,61 @@
     row.querySelector(".row-delete").addEventListener("click", function () { deleteRow(row); });
   }
 
+  var ENTITY_MAP = {
+    client_id: "clients", site_id: "sites", vehicle_id: "vehicles",
+    driver_id: "drivers", subcontractor_id: "subcontractors",
+  };
+
+  // 現場<select>を、指定した元請(clientId)に紐づく現場だけに絞って作り直す。
+  // clientIdが空なら「元請未設定」の現場(client_id===null)だけを候補にする。
+  function populateSiteOptions(row, clientId, selectedSiteId) {
+    var siteSelect = row.querySelector('[data-field="site_id"]');
+    Array.from(siteSelect.options).forEach(function (opt) {
+      if (opt.value !== "" && opt.value !== "__new__") {
+        siteSelect.removeChild(opt);
+      }
+    });
+    var sentinel = siteSelect.querySelector('option[value="__new__"]');
+    var normalizedClientId = clientId ? Number(clientId) : null;
+    CONF.sites.forEach(function (site) {
+      var siteClientId = (site.client_id === null || site.client_id === undefined) ? null : Number(site.client_id);
+      if (siteClientId === normalizedClientId) {
+        var opt = document.createElement("option");
+        opt.value = site.id;
+        opt.textContent = site.name;
+        siteSelect.insertBefore(opt, sentinel);
+      }
+    });
+    siteSelect.value = selectedSiteId ? String(selectedSiteId) : "";
+  }
+
   function handleSelectChange(row, select) {
     if (select.value === "__new__") {
-      var entityMap = { client_id: "clients", vehicle_id: "vehicles", driver_id: "drivers", subcontractor_id: "subcontractors" };
-      var entity = entityMap[select.dataset.field];
+      var entity = ENTITY_MAP[select.dataset.field];
       var name = window.prompt("新しく登録する名前を入力してください");
       if (!name) {
         select.value = "";
         return;
       }
+      var body = { name: name };
+      if (entity === "sites") {
+        // 現場は元請に紐づくため、この行で選ばれている元請も一緒に送る
+        // (元請未選択のままでも登録できる = 元請未設定の現場として作成される)。
+        body.client_id = row.querySelector('[data-field="client_id"]').value || null;
+      }
       var url = CONF.quickAddUrlTemplate.replace("ENTITY", entity);
       fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name }),
+        body: JSON.stringify(body),
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
           if (!data.id) { select.value = ""; return; }
+          if (entity === "sites") {
+            // 他の行のプルダウン再構築でも新しい現場が見えるようキャッシュに追加
+            CONF.sites.push({ id: data.id, name: data.name, client_id: data.client_id });
+          }
           var opt = document.createElement("option");
           opt.value = data.id;
           opt.textContent = data.name;
@@ -164,6 +201,13 @@
         })
         .catch(function () { select.value = ""; });
       return;
+    }
+
+    if (select.dataset.field === "client_id") {
+      // 元請を変更したら、選択済みの現場は(別の元請の現場である可能性が高いため)
+      // サイレントにクリアして候補を作り直す。確認ダイアログは出さない
+      // (低頻度・低リスクな操作にダイアログを挟むと日常入力の妨げになるため)。
+      populateSiteOptions(row, select.value, null);
     }
     saveRow(row, true);
   }

@@ -72,6 +72,52 @@ def main():
     r = client.post("/masters/quick-add/clients", json={"name": "テスト新規元請"})
     check("マスタのクイック追加が成功する", r.status_code == 200 and r.get_json().get("name") == "テスト新規元請")
 
+    # 現場マスタ: 元請ごとのクイック追加・カスケード絞り込み・重複排除
+    client2 = models.list_clients(conn)[2]
+    r = client.post("/masters/quick-add/sites", json={"name": "テスト現場A", "client_id": client_row["id"]})
+    site_a = r.get_json()
+    check(
+        "現場のクイック追加(元請あり)が成功する",
+        r.status_code == 200 and site_a.get("name") == "テスト現場A" and site_a.get("client_id") == client_row["id"],
+    )
+
+    r = client.post("/masters/quick-add/sites", json={"name": "テスト現場A", "client_id": client2["id"]})
+    site_a_other = r.get_json()
+    check(
+        "同名でも元請が違えば別レコードとして作成される",
+        site_a_other.get("id") != site_a.get("id"),
+    )
+
+    r = client.post("/masters/quick-add/sites", json={"name": "テスト現場B(元請未設定)"})
+    site_unassigned = r.get_json()
+    check(
+        "現場のクイック追加(元請未設定)が成功する",
+        r.status_code == 200 and site_unassigned.get("client_id") is None,
+    )
+    id_dup1 = models.get_or_create_site(conn, "テスト現場B(元請未設定)", client_id=None)
+    check(
+        "元請未設定の現場を2回作っても重複しない(get_or_create_siteのNULL対応)",
+        id_dup1 == site_unassigned["id"],
+    )
+
+    r = client.post(
+        f"/dispatch/entries/{entry['id']}/update",
+        json={"fields": {"site_id": site_a["id"]}, "expected_version": entry["version"] + 1},
+    )
+    check("配車行にsite_idを保存できる", r.status_code == 200 and r.get_json()["ok"])
+    entry_with_site = models.get_dispatch_entry(conn, entry["id"])
+    check(
+        "site_id保存時にsite_name_snapshotがサーバー側で自動生成される",
+        entry_with_site["site_id"] == site_a["id"] and entry_with_site["site_name_snapshot"] == "テスト現場A",
+    )
+
+    r = client.post(f"/dispatch/entries/{entry['id']}/duplicate")
+    duplicated_html = r.data
+    check("複製時にsite_idも複製される", (f'value="{site_a["id"]}"'.encode()) in duplicated_html)
+
+    r = client.get("/masters")
+    check("マスタ管理に現場マスタが表示される", r.status_code == 200 and "現場マスタ".encode() in r.data)
+
     # 実績確定 -> 請求書作成の一連の流れ
     models.confirm_entry_result(
         conn, entry["id"], category="昼", quantity=8.0, unit_price=38000, operator="テスト事務員",

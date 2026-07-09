@@ -1,4 +1,4 @@
-{% macro render_row(entry, clients, vehicles, drivers, subcontractors) %}
+{% macro render_row(entry, clients, sites, vehicles, drivers, subcontractors) %}
 <tr class="dispatch-row {{ 'row-blank' if entry['client_id'] is none and entry['count'] is none else '' }}"
     data-entry-id="{{ entry['id'] }}" data-version="{{ entry['version'] }}">
   <td class="row-no"></td>
@@ -11,7 +11,15 @@
       <option value="__new__">＋新規登録...</option>
     </select>
   </td>
-  <td><input type="text" data-field="site_name_snapshot" value="{{ entry['site_name_snapshot'] or '' }}" list="site-name-options"></td>
+  <td>
+    <select data-field="site_id">
+      <option value=""></option>
+      {% for site in sites if site['client_id'] == entry['client_id'] %}
+        <option value="{{ site['id'] }}" {{ 'selected' if site['id'] == entry['site_id'] else '' }}>{{ site['name'] }}</option>
+      {% endfor %}
+      <option value="__new__">＋新規登録...</option>
+    </select>
+  </td>
   <td><input type="number" data-field="count" value="{{ entry['count'] if entry['count'] is not none else '' }}" min="0" style="width:4em"></td>
   <td>
     <select data-field="vehicle_id">
