@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/voicelogi.db
+data/voicelogi.db-wal
+data/voicelogi.db-shm
+data/backups/
+output/invoices/

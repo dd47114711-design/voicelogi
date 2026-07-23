@@ -1,0 +1,29 @@
+{% extends "staff/base.html" %}
+{% block title %}配車 検索{% endblock %}
+{% block content %}
+<h1>配車 横断検索</h1>
+<form method="get">
+  <input type="text" name="q" value="{{ q }}" placeholder="元請/車番/運転手/現場名">
+  <button type="submit">検索</button>
+</form>
+
+{% if q %}
+<h2>「{{ q }}」の検索結果 ({{ results|length }}件)</h2>
+<table class="grid">
+  <thead><tr><th>日付</th><th>元請</th><th>現場名</th><th>台数</th><th>車番</th><th>運転手</th><th>状態</th></tr></thead>
+  <tbody>
+    {% for r in results %}
+    <tr>
+      <td><a href="{{ url_for('dispatch.grid', date=r['entry_date']) }}">{{ r['entry_date'] }}</a></td>
+      <td>{{ r['client_name'] or r['client_name_snapshot'] or '' }}</td>
+      <td>{{ r['site_name_snapshot'] or '' }}</td>
+      <td>{{ r['count'] or '' }}</td>
+      <td>{{ r['vehicle_no'] or '' }}</td>
+      <td>{{ r['driver_name'] or '' }}</td>
+      <td>{{ r['status'] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

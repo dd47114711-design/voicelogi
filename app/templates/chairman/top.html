@@ -1,0 +1,8 @@
+{% extends "chairman/base.html" %}
+{% block content %}
+<div class="chairman-title">配車・請求システム</div>
+<div class="tile-grid">
+  <a class="tile" href="{{ url_for('chairman.today') }}"><span><span class="emoji">📋</span>今日の配車を見る</span></a>
+  <a class="tile invoices" href="{{ url_for('chairman.invoices') }}"><span><span class="emoji">🧾</span>請求書の確認</span></a>
+</div>
+{% endblock %}

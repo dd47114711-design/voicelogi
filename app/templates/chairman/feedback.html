@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>{{ message }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='chairman.css') }}">
+<meta http-equiv="refresh" content="3;url={{ url_for('chairman.top') }}">
+</head>
+<body>
+<main class="chairman-content">
+  <div class="feedback-screen">
+    <div class="feedback-icon">{{ '✓' if icon == 'check' else '📨' }}</div>
+    <div class="feedback-message">{{ message }}</div>
+    <div class="feedback-sub">(3秒後に自動で戻ります)</div>
+  </div>
+</main>
+</body>
+</html>

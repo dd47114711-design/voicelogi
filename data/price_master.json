@@ -1,0 +1,1722 @@
+[
+  {
+    "client": "RK・KAWATA",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱俵口建設",
+    "prices": [
+      {
+        "amount": null,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱青木商店",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱俵口建設 4t車",
+    "prices": [
+      {
+        "amount": 24000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱淺沼組",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/2　  40,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱フェアロード",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/1    40,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": "4/1    45,000",
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱一伸",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱フェアロード 4t車",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/1    30,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": "7/16  32,000",
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "板橋産業",
+    "prices": [
+      {
+        "amount": null,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱福岡重機センター",
+    "prices": [
+      {
+        "amount": null,
+        "note": "6/3   40,000",
+        "category": "昼"
+      },
+      {
+        "amount": 42000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "6/3   45,000",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱イワシタ舗道",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 42000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "福山総合建設㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": "4/1    37,000",
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "永順産業㈱",
+    "prices": [
+      {
+        "amount": 35000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "(東部)38,000",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "藤木建設㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": "2/15  38,000",
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "国交省　38,000",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱エトウ",
+    "prices": [
+      {
+        "amount": 32000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱フジタ建設",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/1    34,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱大島組",
+    "prices": [
+      {
+        "amount": 32000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "藤田農園",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱大森工業",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "増田運送㈲",
+    "prices": [
+      {
+        "amount": null,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱大山組",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲松尾建設工業",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱小田組",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱松原土木",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "カイダ建設㈱",
+    "prices": [
+      {
+        "amount": 37000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲松本技建",
+    "prices": [
+      {
+        "amount": 35000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "金子建設興業㈲",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "宮﨑・ヤナギJV",
+    "prices": [
+      {
+        "amount": 33000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "川越建設㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 45000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱松尾組",
+    "prices": [
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "木内産業運輸㈱",
+    "prices": [
+      {
+        "amount": 32000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱松尾道路",
+    "prices": [
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲北九州環境サポート",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱宮﨑組",
+    "prices": [
+      {
+        "amount": null,
+        "note": "TEL  37000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "協和建設㈱",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/2   40,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱宮本組",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/2　  40,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲享和工業",
+    "prices": [
+      {
+        "amount": 32000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱宮本舗道工業",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 43000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "2/16   TEL社長",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱久保建設",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 42000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱八幡道路",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 45000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "晃永工業㈲",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱山賀",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "晃永工業㈲ 4t車",
+    "prices": [
+      {
+        "amount": 26000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱山住工業",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱高信産業",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱山瀬組",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "興和道路㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 45000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲山田建設興業",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "興和道路㈱  4t車",
+    "prices": [
+      {
+        "amount": 26000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 29000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "昼　11/18TEL",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲山田建設興業 ﾌｪｱﾛｰﾄﾞ",
+    "prices": [
+      {
+        "amount": 33000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "小西建設興業㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "Lｹﾞｰﾄ　42,000",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲山田建設興業 4t車",
+    "prices": [
+      {
+        "amount": 26000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "小林建設㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": "4/23  38,000",
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "Lｹﾞｰﾄ　40,000",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱友和建設",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "坂口組",
+    "prices": [
+      {
+        "amount": 20000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱友和建設 4t車",
+    "prices": [
+      {
+        "amount": 24000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "三共建設㈱合材工場",
+    "prices": [
+      {
+        "amount": null,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲ヨシアキ建設",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲三建建設",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "ローカルワーカー㈱",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱塩月工業",
+    "prices": [
+      {
+        "amount": 36000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "浅沼・有田JV",
+    "prices": [
+      {
+        "amount": null,
+        "note": "5/12  38,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱スズキ",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 45000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "鹿島道路㈱",
+    "prices": [
+      {
+        "amount": 39000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱大新",
+    "prices": [
+      {
+        "amount": null,
+        "note": "5/8   38,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "YAMAZAKI",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "大成ロテック㈱",
+    "prices": [
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱山口舗道",
+    "prices": [
+      {
+        "amount": null,
+        "note": "4/3　  40,000",
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱高瀬組",
+    "prices": [
+      {
+        "amount": 35000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": "興和(夜)39,000",
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "竹本産業㈲",
+    "prices": [
+      {
+        "amount": 32000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲東洋開発",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 45000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱東陽建工",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲永井運輸",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱永津建設",
+    "prices": [
+      {
+        "amount": 35000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "中村建設",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": "国交省　34,000",
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "中村工業㈱",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "中本重機㈱",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱西村砕石大谷工場",
+    "prices": [
+      {
+        "amount": 35000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈲西村組",
+    "prices": [
+      {
+        "amount": 38000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "日本道路㈱福岡合材センター",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": 45000,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "日本道路㈱福岡合材センター 4t車",
+    "prices": [
+      {
+        "amount": 30000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱日本物流サービス",
+    "prices": [
+      {
+        "amount": 34000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "梅光産業㈱",
+    "prices": [
+      {
+        "amount": null,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱早川建設",
+    "prices": [
+      {
+        "amount": 40000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱PIT",
+    "prices": [
+      {
+        "amount": 35000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  },
+  {
+    "client": "㈱PIT 4t車",
+    "prices": [
+      {
+        "amount": 25000,
+        "note": null,
+        "category": "昼"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "夜"
+      },
+      {
+        "amount": null,
+        "note": null,
+        "category": "その他"
+      }
+    ]
+  }
+]

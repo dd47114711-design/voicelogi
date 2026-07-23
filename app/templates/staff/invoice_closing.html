@@ -1,0 +1,50 @@
+{% extends "staff/base.html" %}
+{% block title %}月末締め作業{% endblock %}
+{% block content %}
+<h1>月末締め作業</h1>
+<form method="get" class="toolbar">
+  <label>対象期間 <input type="date" name="period_start" value="{{ period_start }}"></label>
+  〜 <input type="date" name="period_end" value="{{ period_end }}">
+  <label>
+    <input type="hidden" name="hide_zero" value="0">
+    <input type="checkbox" name="hide_zero" value="1" {% if hide_zero %}checked{% endif %} onchange="this.form.submit()">
+    未請求ありのみ表示
+  </label>
+  <button type="submit" class="secondary">表示</button>
+</form>
+
+<table class="grid">
+  <thead><tr><th>取引先</th><th>未請求件数</th><th></th></tr></thead>
+  <tbody>
+    {% for row in summary %}
+    <tr>
+      <td>{{ row['client_name'] }}</td>
+      <td>{{ row['unbilled_count'] }}件</td>
+      <td>
+        {% if row['unbilled_count'] > 0 %}
+          <a class="btn" href="{{ url_for('invoice.new', client_id=row['client_id'], period_start=period_start, period_end=period_end) }}">請求書を作成</a>
+        {% else %}
+          <span class="note">対象なし</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>最近発行した請求書</h2>
+<table class="grid">
+  <thead><tr><th>発行日</th><th>取引先</th><th>税込合計</th><th>会長確認</th><th></th></tr></thead>
+  <tbody>
+    {% for inv in recent_invoices %}
+    <tr>
+      <td>{{ inv['invoice_date'] }}</td>
+      <td>{{ inv['client_name'] }}</td>
+      <td>¥{{ '{:,}'.format(inv['total_amount']) }}</td>
+      <td>{{ '見ました(' + inv['last_reviewed_at'] + ')' if inv['last_reviewed_at'] else '未確認' }}</td>
+      <td><a class="btn secondary" href="{{ url_for('invoice.view', invoice_id=inv['id']) }}">見る</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

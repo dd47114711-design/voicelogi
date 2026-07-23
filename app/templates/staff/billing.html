@@ -1,0 +1,71 @@
+{% extends "staff/base.html" %}
+{% block title %}実績整理{% endblock %}
+{% block content %}
+<h1>実績整理</h1>
+<form method="get" class="toolbar">
+  <label>元請
+    <select name="client_id" required>
+      <option value="">選んでください</option>
+      {% for c in clients %}
+        <option value="{{ c['id'] }}" {{ 'selected' if c['id'] == client_id else '' }}>{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>期間 <input type="date" name="period_start" value="{{ period_start }}"></label>
+  〜 <input type="date" name="period_end" value="{{ period_end }}">
+  <button type="submit" class="secondary">表示</button>
+  <div class="spacer"></div>
+  <a class="btn secondary" href="{{ url_for('prices.needs_review') }}">⚠単価 要確認一覧を見る</a>
+</form>
+
+{% if client %}
+<div class="card">
+  <strong>{{ client['name'] }}</strong> の単価表:
+  {% for cat, info in price_suggestions.items() %}
+    {% if info.amount %}
+      {{ cat }}: ¥{{ '{:,}'.format(info.amount) }}
+    {% else %}
+      {{ cat }}: <span class="needs-review">⚠要確認{% if info.note %}({{ info.note }}){% endif %}</span>
+    {% endif %}
+    &nbsp;&nbsp;
+  {% endfor %}
+</div>
+
+<form method="post" action="{{ url_for('billing.confirm') }}">
+  <input type="hidden" name="client_id" value="{{ client_id }}">
+  <input type="hidden" name="period_start" value="{{ period_start }}">
+  <input type="hidden" name="period_end" value="{{ period_end }}">
+  <table class="grid">
+    <thead>
+      <tr><th>済</th><th>日付</th><th>台数</th><th>区分</th><th>数量H</th><th>単価</th><th>状態</th></tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td style="text-align:center">
+          <input type="checkbox" name="checked_{{ e['id'] }}" {{ 'checked' if e['checked'] else '' }}>
+          <input type="hidden" name="entry_id" value="{{ e['id'] }}">
+        </td>
+        <td>{{ e['entry_date'] }}</td>
+        <td>{{ e['count'] or '' }}</td>
+        <td>
+          <select name="category_{{ e['id'] }}">
+            <option value=""></option>
+            {% for cat in categories %}
+              <option value="{{ cat }}" {{ 'selected' if e['category'] == cat else '' }}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input type="number" step="0.1" name="quantity_{{ e['id'] }}" value="{{ e['quantity'] if e['quantity'] is not none else '' }}" style="width:5em"></td>
+        <td><input type="number" name="unit_price_{{ e['id'] }}" value="{{ e['unit_price'] if e['unit_price'] is not none else '' }}" style="width:7em"></td>
+        <td>{{ e['status'] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">この期間に配車入力がありません。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><button type="submit">チェックした行を実績確定する</button></p>
+</form>
+{% endif %}
+{% endblock %}

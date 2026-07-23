@@ -1,0 +1,119 @@
+/* 会長用: 見るだけ・大ボタンのみ。実機での試し打ち検証が必須(2回目レビュー指摘)。
+   本文は最低28pt(=約37px)、合計金額は48pt(=約64px)を目安に、タップ領域は
+   縦横とも十分な大きさ(目安15〜20mm=約60〜80px)を確保する。 */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0d2b45;
+  color: #fff;
+  font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  font-size: 37px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.chairman-content {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.chairman-title {
+  font-size: 1.1em;
+  text-align: center;
+  margin: 12px 0 32px;
+}
+
+.tile-grid {
+  display: flex;
+  flex: 1;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+}
+.tile {
+  flex: 1 1 300px;
+  min-height: 260px;
+  background: #2e86c1;
+  border-radius: 20px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1em;
+  font-weight: bold;
+  text-decoration: none;
+  padding: 20px;
+  border: none;
+  cursor: pointer;
+}
+.tile.invoices { background: #c0392b; }
+.tile .emoji { display: block; font-size: 2em; margin-bottom: 12px; }
+
+.back-link {
+  display: inline-block;
+  padding: 16px 28px;
+  background: #555;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 12px;
+  font-size: 0.8em;
+  margin-bottom: 20px;
+}
+
+.dispatch-list { flex: 1; }
+.dispatch-item {
+  background: #16405f;
+  border-radius: 16px;
+  padding: 20px 28px;
+  margin-bottom: 20px;
+}
+.dispatch-item .main-line { font-size: 1em; font-weight: bold; }
+.dispatch-item .sub-line { font-size: 0.7em; color: #cfe0ee; margin-top: 6px; }
+
+.total-amount {
+  font-size: 1.3em;
+  font-weight: bold;
+  text-align: center;
+  margin: 30px 0;
+}
+
+.big-button {
+  display: block;
+  width: 100%;
+  padding: 34px;
+  font-size: 0.85em;
+  font-weight: bold;
+  border-radius: 20px;
+  border: none;
+  color: #fff;
+  margin-bottom: 24px;
+  cursor: pointer;
+}
+.big-button.primary { background: #27ae60; }
+.big-button.alert { background: #e67e22; }
+
+.invoice-card {
+  background: #16405f;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.invoice-card .amount { font-size: 1.1em; font-weight: bold; margin: 12px 0 20px; }
+
+.feedback-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.feedback-icon { font-size: 4em; margin-bottom: 20px; }
+.feedback-message { font-size: 1.1em; font-weight: bold; }
+.feedback-sub { font-size: 0.6em; color: #cfe0ee; margin-top: 16px; }
+
+.empty-note { text-align: center; color: #cfe0ee; font-size: 0.7em; margin-top: 60px; }

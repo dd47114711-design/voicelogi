@@ -1,0 +1,235 @@
+// 音声配車入力: 文字起こしテキストの解析結果(下書き)を表示し、未確定項目は
+// プルダウンで手動選択できるようにしてから登録する。
+(function () {
+  "use strict";
+  var CONF = window.VOICE_CONF;
+  var draft = null;
+
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    }
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function buildSelect(options, selectedId, testAttr) {
+    var select = document.createElement("select");
+    if (testAttr) select.setAttribute("data-role", testAttr);
+    select.appendChild(el("option", { value: "" }, "-- 未選択 --"));
+    options.forEach(function (opt) {
+      var label = opt.name || opt.plate_no;
+      var o = el("option", { value: opt.id }, label);
+      if (selectedId && String(opt.id) === String(selectedId)) {
+        o.selected = true;
+      }
+      select.appendChild(o);
+    });
+    return select;
+  }
+
+  function renderWarnings(warnings) {
+    var box = document.getElementById("draft-warnings");
+    box.innerHTML = "";
+    if (!warnings || !warnings.length) return;
+    var ul = document.createElement("ul");
+    ul.className = "needs-review";
+    warnings.forEach(function (w) { ul.appendChild(el("li", null, w)); });
+    box.appendChild(ul);
+  }
+
+  function renderClientSite() {
+    var clientCell = document.getElementById("draft-client");
+    clientCell.innerHTML = "";
+    var clientSelect = buildSelect(CONF.masters.clients, draft.client.matched ? draft.client.id : null, "client");
+    clientCell.appendChild(clientSelect);
+    if (draft.client.raw_text) {
+      clientCell.appendChild(el("span", { class: "note" }, "  (聞き取り: " + draft.client.raw_text + ")"));
+    }
+
+    var siteCell = document.getElementById("draft-site");
+    siteCell.innerHTML = "";
+    var siteSelect = buildSelect(filterSitesByClient(clientSelect.value), draft.site.matched ? draft.site.id : null, "site");
+    siteCell.appendChild(siteSelect);
+    if (draft.site.raw_text) {
+      siteCell.appendChild(el("span", { class: "note" }, "  (聞き取り: " + draft.site.raw_text + ")"));
+    }
+
+    clientSelect.addEventListener("change", function () {
+      var newSiteSelect = buildSelect(filterSitesByClient(clientSelect.value), null, "site");
+      siteCell.innerHTML = "";
+      siteCell.appendChild(newSiteSelect);
+    });
+  }
+
+  function filterSitesByClient(clientId) {
+    if (!clientId) return CONF.masters.sites.filter(function (s) { return !s.client_id; });
+    return CONF.masters.sites.filter(function (s) { return String(s.client_id) === String(clientId); });
+  }
+
+  function renderOwnVehicles() {
+    var tbody = document.getElementById("draft-own-vehicles");
+    tbody.innerHTML = "";
+    draft.own_vehicles.forEach(function (v) {
+      var tr = document.createElement("tr");
+      tr.appendChild(el("td", null, "聞き取り: " + v.raw_text));
+      var td = document.createElement("td");
+      td.appendChild(buildSelect(CONF.masters.vehicles, v.matched ? v.id : null, "own_vehicle"));
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    if (!draft.own_vehicles.length) {
+      tbody.appendChild(el("tr", null, null)).appendChild(el("td", { colspan: "2" }, "自社車両は抽出されませんでした"));
+    }
+  }
+
+  function renderSubcontractors() {
+    var tbody = document.getElementById("draft-subcontractors");
+    tbody.innerHTML = "";
+    draft.subcontractors.forEach(function (s) {
+      var tr = document.createElement("tr");
+      tr.appendChild(el("td", null, "聞き取り: " + s.raw_text));
+      var selTd = document.createElement("td");
+      selTd.appendChild(buildSelect(CONF.masters.subcontractors, s.matched ? s.id : null, "subcontractor"));
+      tr.appendChild(selTd);
+      var countTd = document.createElement("td");
+      var countInput = el("input", { type: "number", min: "1", value: s.count, "data-role": "subcontractor-count", style: "width:5em" });
+      countTd.appendChild(countInput);
+      countTd.appendChild(document.createTextNode(" 台"));
+      tr.appendChild(countTd);
+      tbody.appendChild(tr);
+    });
+    if (!draft.subcontractors.length) {
+      tbody.appendChild(el("tr", null, null)).appendChild(el("td", { colspan: "3" }, "傭車は抽出されませんでした"));
+    }
+  }
+
+  function renderDateCandidate() {
+    var box = document.getElementById("draft-date-candidate");
+    box.innerHTML = "";
+    var dateInput = document.getElementById("dispatch-date");
+    if (!draft.dispatch_date_candidate || draft.dispatch_date_candidate === dateInput.value) return;
+    box.appendChild(document.createTextNode("テキストから読み取った日付: " + draft.dispatch_date_candidate + " "));
+    var applyBtn = el("button", { type: "button", class: "secondary" }, "この日付にする");
+    applyBtn.addEventListener("click", function () {
+      dateInput.value = draft.dispatch_date_candidate;
+      box.innerHTML = "";
+    });
+    box.appendChild(applyBtn);
+  }
+
+  function renderDraft(data) {
+    draft = data;
+    document.getElementById("draft-card").style.display = "";
+    renderWarnings(draft.warnings);
+    renderDateCandidate();
+    renderClientSite();
+    document.getElementById("draft-total").textContent = draft.total_trucks !== null ? draft.total_trucks + "台" : "(抽出できませんでした)";
+    document.getElementById("draft-time").textContent = draft.start_time || "(抽出できませんでした)";
+    renderOwnVehicles();
+    renderSubcontractors();
+    document.getElementById("commit-messages").innerHTML = "";
+    var commitBtn = document.getElementById("commit-btn");
+    commitBtn.disabled = false;
+    commitBtn.textContent = "登録";
+  }
+
+  function collectCommitPayload() {
+    // レビュー指摘の反映: 未確定(idなし)の行を送信前にここで黙って除外すると、
+    // サーバー側の「未確定のまま登録拒否」チェックが実運用で発火せず、
+    // 一部の項目だけが静かに抜け落ちたまま登録されてしまう。下書きに表示されている
+    // 行は(確定・未確定を問わず)すべてそのまま送り、判定は必ずサーバー側に委ねる。
+    var clientSelect = document.querySelector('#draft-client select[data-role="client"]');
+    var siteSelect = document.querySelector('#draft-site select[data-role="site"]');
+    var ownVehicles = Array.from(document.querySelectorAll('#draft-own-vehicles select[data-role="own_vehicle"]'))
+      .map(function (sel) { return { id: sel.value ? parseInt(sel.value, 10) : null }; });
+    var subcontractorRows = document.querySelectorAll("#draft-subcontractors tr");
+    var subcontractors = [];
+    subcontractorRows.forEach(function (row) {
+      var sel = row.querySelector('select[data-role="subcontractor"]');
+      var countInput = row.querySelector('[data-role="subcontractor-count"]');
+      if (!sel || !countInput) return;
+      var id = sel.value ? parseInt(sel.value, 10) : null;
+      var count = countInput.value ? parseInt(countInput.value, 10) : null;
+      subcontractors.push({ id: id, count: count });
+    });
+
+    return {
+      dispatch_date: document.getElementById("dispatch-date").value,
+      client: { id: clientSelect.value ? parseInt(clientSelect.value, 10) : null },
+      site: { id: siteSelect.value ? parseInt(siteSelect.value, 10) : null },
+      start_time: draft.start_time,
+      own_vehicles: ownVehicles,
+      subcontractors: subcontractors,
+    };
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("parse-btn").addEventListener("click", function () {
+      var payload = {
+        dispatch_date: document.getElementById("dispatch-date").value,
+        text: document.getElementById("transcript-text").value,
+      };
+      fetch(CONF.parseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then(function (res) { return res.json(); })
+        .then(renderDraft);
+    });
+
+    function doCommit(btn, extra) {
+      btn.disabled = true;
+      btn.textContent = "登録中...";
+      var payload = collectCommitPayload();
+      if (extra) {
+        Object.keys(extra).forEach(function (k) { payload[k] = extra[k]; });
+      }
+      fetch(CONF.commitUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then(function (res) { return res.json().then(function (data) { return { status: res.status, data: data }; }); })
+        .then(function (result) {
+          if (result.status === 200 && result.data.ok) {
+            window.location.href = CONF.gridUrlTemplate + "?date=" + encodeURIComponent(payload.dispatch_date);
+            return;
+          }
+          btn.disabled = false;
+          btn.textContent = "登録";
+          var box = document.getElementById("commit-messages");
+          box.innerHTML = "";
+          var ul = document.createElement("ul");
+          ul.className = "needs-review";
+          (result.data.messages || ["登録に失敗しました"]).forEach(function (m) {
+            ul.appendChild(el("li", null, m));
+          });
+          box.appendChild(ul);
+
+          // 重複登録の可能性がある場合(409)は、内容を確認したうえで
+          // そのまま登録を続けられるよう、確認ボタンを別途出す。
+          if (result.status === 409 && result.data.error === "possible_duplicate") {
+            var confirmBtn = el("button", { type: "button", class: "secondary" }, "このまま登録する");
+            confirmBtn.addEventListener("click", function () {
+              box.innerHTML = "";
+              doCommit(btn, { confirm_duplicate: true });
+            });
+            box.appendChild(confirmBtn);
+          }
+        })
+        .catch(function () {
+          btn.disabled = false;
+          btn.textContent = "登録";
+        });
+    }
+
+    document.getElementById("commit-btn").addEventListener("click", function () {
+      // 二重登録防止: 処理完了(成功時は画面遷移、失敗時は再度押せるようにする)まで
+      // ボタンを無効化する。成功時はリダイレクトするので再度押される心配はない。
+      doCommit(this, null);
+    });
+  });
+})();
