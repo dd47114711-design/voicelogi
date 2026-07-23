@@ -3,6 +3,7 @@
 使い捨てスクリプト(pytestの正式なテストスイートはTask #7で別途整備する)。
 実行方法: python3 scripts/smoke_test.py
 """
+import datetime
 import os
 import sys
 
@@ -220,7 +221,8 @@ def main():
     check("傭車が全て傭車マスタに一致する", all(s["matched"] for s in draft["subcontractors"]))
     check("傭車の合計台数が9(2+2+4+1)", sum(s["count"] for s in draft["subcontractors"]) == 9)
     check("13(4自社+9傭車) != 16申告 で「3台不足」の警告が出る", any("3台不足" in w for w in draft["warnings"]))
-    check("日付候補が明日(2026-07-10)として抽出される", draft["dispatch_date_candidate"] == "2026-07-10")
+    tomorrow_iso = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+    check(f"日付候補が明日({tomorrow_iso})として抽出される", draft["dispatch_date_candidate"] == tomorrow_iso)
 
     commit_payload = {
         "dispatch_date": "2026-07-10",
@@ -245,6 +247,51 @@ def main():
         all(e["client_id"] == kaida_client["id"] and e["site_id"] == site_eijun_id for e in committed),
     )
     check("memo欄に配車時刻が追記される", all(e["memo"] == "配車時刻 07:30" for e in committed))
+
+    # 句点なしで見出しと時間が同一文に結合されていても見出しを読み飛ばさない
+    # (以前のclassify_sentenceは1文=1種類の排他分類だったため、見出し文に
+    # 「時間」というキーワードが同居すると見出しが丸ごと無視されるバグがあった)
+    merged_text = "カイダ建設、永順に16台、時間は7時半。自社は1番。坂本2台。"
+    r_merged = client.post("/dispatch/voice/parse", json={"dispatch_date": "2026-07-12", "text": merged_text})
+    check("結合文の下書き作成APIが200を返す", r_merged.status_code == 200)
+    draft_merged = r_merged.get_json()
+    check("結合文でも元請を抽出できる", draft_merged["client"]["matched"] and draft_merged["client"]["id"] == kaida_client["id"])
+    check("結合文でも現場を抽出できる", draft_merged["site"]["matched"] and draft_merged["site"]["id"] == site_eijun_id)
+    check("結合文でも申告台数16台を抽出できる", draft_merged["total_trucks"] == 16)
+    check("結合文でも時間7時半を抽出できる", draft_merged["start_time"] == "07:30")
+
+    # 重複登録防止: 同じ元請・現場・配車日への登録が直近5分以内にあると409で警告される
+    dup_payload = dict(commit_payload)
+    r_dup = client.post("/dispatch/voice/commit", json=dup_payload)
+    check(
+        "直近重複登録は409(possible_duplicate)で警告される",
+        r_dup.status_code == 409 and r_dup.get_json()["error"] == "possible_duplicate",
+    )
+    check("409応答では行が増えていない", len(models.list_dispatch_entries(conn, entry_date="2026-07-10")) == 8)
+
+    dup_payload["confirm_duplicate"] = True
+    r_dup_confirm = client.post("/dispatch/voice/commit", json=dup_payload)
+    check("confirm_duplicate=trueなら重複でも登録できる", r_dup_confirm.status_code == 200 and r_dup_confirm.get_json()["ok"])
+    check("確認後は8行追加されて16行になる", len(models.list_dispatch_entries(conn, entry_date="2026-07-10")) == 16)
+
+    # 傭車台数の不正値(負数・小数)は400で拒否される
+    r_neg = client.post("/dispatch/voice/commit", json={
+        "dispatch_date": "2026-07-13",
+        "client": {"id": kaida_client["id"]},
+        "site": {"id": site_eijun_id},
+        "own_vehicles": [],
+        "subcontractors": [{"id": sub_ids["坂本"], "count": -1}],
+    })
+    check("台数が負数の傭車を含むcommitは400で拒否される", r_neg.status_code == 400)
+
+    r_decimal = client.post("/dispatch/voice/commit", json={
+        "dispatch_date": "2026-07-13",
+        "client": {"id": kaida_client["id"]},
+        "site": {"id": site_eijun_id},
+        "own_vehicles": [],
+        "subcontractors": [{"id": sub_ids["坂本"], "count": 1.5}],
+    })
+    check("台数が小数の傭車を含むcommitは400で拒否される", r_decimal.status_code == 400)
 
     r2 = client.post(
         "/dispatch/voice/parse",

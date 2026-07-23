@@ -231,20 +231,30 @@ def voice_commit():
         errors.append("現場が未確定です")
 
     # own_vehicles/subcontractors に含まれる項目は、未確定(idなし)のまま送られてきたら
-    # 静かに無視せずエラーにする(下書き画面のフロント側は未確定の行を送信しない設計だが、
-    # サーバー側でも「未確定のまま登録しようとした」ことを検知できるようにしておく)。
+    # 静かに無視せずエラーにする(フロント側(voice_dispatch.js)は下書きに表示されている
+    # 行を確定・未確定を問わずすべて送るので、ここが実質的な唯一の判定箇所になる)。
+    resolved_vehicles = []
     for i, v in enumerate(own_vehicles, start=1):
         if not v.get("id"):
             errors.append(f"自社車両({i}件目)が未確定のまま登録しようとしました")
+        else:
+            resolved_vehicles.append(v)
+
+    resolved_subs = []
     for i, s in enumerate(subcontractors, start=1):
         if not s.get("id"):
             errors.append(f"傭車({i}件目)が未確定のまま登録しようとしました")
-        elif not s.get("count"):
-            errors.append(f"傭車({i}件目)の台数が未入力です")
+            continue
+        # 台数は正の整数のみ許可する(未入力・0・負数・小数・文字列混入を弾く)。
+        # int()は int(1.5) -> 1 のように小数を黙って切り捨ててしまうため、
+        # voice_parse.parse_positive_int で厳密に検証する。
+        count = voice_parse.parse_positive_int(s.get("count"))
+        if count is None:
+            errors.append(f"傭車({i}件目)の台数が未入力か不正です")
+        else:
+            resolved_subs.append({"id": s["id"], "count": count})
 
-    resolved_vehicles = [v for v in own_vehicles if v.get("id")]
-    resolved_subs = [s for s in subcontractors if s.get("id") and s.get("count")]
-    if not resolved_vehicles and not resolved_subs:
+    if not own_vehicles and not subcontractors:
         errors.append("自社車両・傭車のいずれも確定されていません(最低1台必要)")
 
     client_row = models.get_client(g.db, client_id) if client_id else None
@@ -258,6 +268,27 @@ def voice_commit():
 
     if errors:
         return jsonify({"error": "validation_failed", "messages": errors}), 400
+
+    # 重複登録の類似チェック(レビュー指摘の反映): 別々の事務員が同じ音声メモを
+    # それぞれ下書き化・登録した場合や、通信遅延後の再送で二重登録されるのを防ぐため、
+    # 同じ元請・現場・配車日の行が直近5分以内に作られていないか確認する。
+    # DBスキーマは変更せず、既存のcreated_atで判定する。完全な防止ではなく
+    # 「気づかせる」ための確認であり、confirm_duplicate=trueで続行できる。
+    if not payload.get("confirm_duplicate"):
+        recent = g.db.execute(
+            "SELECT COUNT(*) AS n FROM dispatch_entries "
+            "WHERE client_id = ? AND site_id = ? AND entry_date = ? "
+            "AND created_at >= datetime('now', 'localtime', '-5 minutes')",
+            (client_id, site_id, entry_date),
+        ).fetchone()["n"]
+        if recent:
+            return jsonify({
+                "error": "possible_duplicate",
+                "messages": [
+                    f"同じ元請・現場・配車日の配車が直近5分以内に{recent}件登録されています。"
+                    "重複登録の可能性があります。続けて登録しますか？"
+                ],
+            }), 409
 
     memo = f"配車時刻 {start_time}" if start_time else None
     created_ids = []

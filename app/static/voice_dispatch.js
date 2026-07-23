@@ -136,11 +136,14 @@
   }
 
   function collectCommitPayload() {
+    // レビュー指摘の反映: 未確定(idなし)の行を送信前にここで黙って除外すると、
+    // サーバー側の「未確定のまま登録拒否」チェックが実運用で発火せず、
+    // 一部の項目だけが静かに抜け落ちたまま登録されてしまう。下書きに表示されている
+    // 行は(確定・未確定を問わず)すべてそのまま送り、判定は必ずサーバー側に委ねる。
     var clientSelect = document.querySelector('#draft-client select[data-role="client"]');
     var siteSelect = document.querySelector('#draft-site select[data-role="site"]');
     var ownVehicles = Array.from(document.querySelectorAll('#draft-own-vehicles select[data-role="own_vehicle"]'))
-      .map(function (sel) { return { id: sel.value ? parseInt(sel.value, 10) : null }; })
-      .filter(function (v) { return v.id; });
+      .map(function (sel) { return { id: sel.value ? parseInt(sel.value, 10) : null }; });
     var subcontractorRows = document.querySelectorAll("#draft-subcontractors tr");
     var subcontractors = [];
     subcontractorRows.forEach(function (row) {
@@ -149,7 +152,7 @@
       if (!sel || !countInput) return;
       var id = sel.value ? parseInt(sel.value, 10) : null;
       var count = countInput.value ? parseInt(countInput.value, 10) : null;
-      if (id && count) subcontractors.push({ id: id, count: count });
+      subcontractors.push({ id: id, count: count });
     });
 
     return {
@@ -177,13 +180,13 @@
         .then(renderDraft);
     });
 
-    document.getElementById("commit-btn").addEventListener("click", function () {
-      var btn = this;
-      // 二重登録防止: 処理完了(成功時は画面遷移、失敗時は再度押せるようにする)まで
-      // ボタンを無効化する。成功時はリダイレクトするので再度押される心配はない。
+    function doCommit(btn, extra) {
       btn.disabled = true;
       btn.textContent = "登録中...";
       var payload = collectCommitPayload();
+      if (extra) {
+        Object.keys(extra).forEach(function (k) { payload[k] = extra[k]; });
+      }
       fetch(CONF.commitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,11 +208,28 @@
             ul.appendChild(el("li", null, m));
           });
           box.appendChild(ul);
+
+          // 重複登録の可能性がある場合(409)は、内容を確認したうえで
+          // そのまま登録を続けられるよう、確認ボタンを別途出す。
+          if (result.status === 409 && result.data.error === "possible_duplicate") {
+            var confirmBtn = el("button", { type: "button", class: "secondary" }, "このまま登録する");
+            confirmBtn.addEventListener("click", function () {
+              box.innerHTML = "";
+              doCommit(btn, { confirm_duplicate: true });
+            });
+            box.appendChild(confirmBtn);
+          }
         })
         .catch(function () {
           btn.disabled = false;
           btn.textContent = "登録";
         });
+    }
+
+    document.getElementById("commit-btn").addEventListener("click", function () {
+      // 二重登録防止: 処理完了(成功時は画面遷移、失敗時は再度押せるようにする)まで
+      // ボタンを無効化する。成功時はリダイレクトするので再度押される心配はない。
+      doCommit(this, null);
     });
   });
 })();
