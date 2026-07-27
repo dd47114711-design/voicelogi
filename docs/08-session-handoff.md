@@ -22,6 +22,8 @@ KoeHaishaは業務改善ソフトではなく、**会社のノウハウを次世
 
 会長の仕事を奪うシステムではない。会長の仕事を引き継げる仕組みを作りたい――これが、このプロジェクトの本当の目的である。
 
+フェーズ全体の見通しは`docs/09-roadmap.md`、日々の開発で守る具体的なルールは`docs/10-development-principles.md`を参照。
+
 ## リポジトリ
 
 - `dd47114711-design/voicelogi`
@@ -101,4 +103,6 @@ KoeHaishaは業務改善ソフトではなく、**会社のノウハウを次世
 | `docs/05-price-data-analysis.md` | 単価表データ（86社）の分析結果 |
 | `docs/06-phase2-design-proposal.md` | フェーズ2設計提案・初版（`07`で更新済み、経緯として保持） |
 | `docs/07-phase2-design-v2.md` | フェーズ2設計・確定版（**最新・正**） |
-| `docs/08-session-handoff.md` | 本ファイル（セッション引き継ぎ用） |
+| `docs/08-session-handoff.md` | 本ファイル（開発理念・セッション引き継ぎ用） |
+| `docs/09-roadmap.md` | フェーズ全体ロードマップ（最終形までの見通し） |
+| `docs/10-development-principles.md` | 開発原則（日々の開発で守るルール集） |
