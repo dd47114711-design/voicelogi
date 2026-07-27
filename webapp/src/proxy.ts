@@ -12,6 +12,9 @@ function needsAuth(pathname: string, method: string): boolean {
   if (/^\/api\/employees\/[^/]+\/current-department$/.test(pathname)) return true;
   if (/^\/api\/employees\/[^/]+\/restore$/.test(pathname)) return true;
   if (pathname === "/api/employees/deleted") return true;
+  // 取引先・現場・単価は業務上の価格情報を含むため、閲覧(GET)も含めて全面的に保護する
+  if (pathname === "/api/clients" || /^\/api\/clients\/[^/]+$/.test(pathname)) return true;
+  if (pathname.startsWith("/api/sites")) return true;
   return false;
 }
 
@@ -45,5 +48,13 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/employees", "/api/employees/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/api/employees",
+    "/api/employees/:path*",
+    "/api/clients",
+    "/api/clients/:path*",
+    "/api/sites",
+    "/api/sites/:path*",
+  ],
 };

@@ -24,9 +24,17 @@ export default async function AdminPage() {
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
           社員管理
         </h1>
-        <Link href="/" className="text-lg font-semibold text-blue-700 underline">
-          出欠札ボードに戻る
-        </Link>
+        <nav className="flex gap-4 text-lg font-semibold">
+          <Link href="/admin/clients" className="text-blue-700 underline">
+            取引先マスターへ
+          </Link>
+          <Link href="/admin/sites" className="text-blue-700 underline">
+            現場マスターへ
+          </Link>
+          <Link href="/" className="text-blue-700 underline">
+            出欠札ボードに戻る
+          </Link>
+        </nav>
       </header>
       <EmployeeAdmin initialEmployees={employees} initialDeletedEmployees={deletedEmployees} />
     </div>
