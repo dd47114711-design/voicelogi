@@ -90,6 +90,21 @@ export function EmployeeAdmin({
     await refresh();
   }
 
+  // 「応援」：本来の所属(home)は変えず、今日だけの表示部門(current)だけ切り替える。
+  // department を省略すると本来の所属に戻す(応援解除)。
+  async function handleSetSupport(id: string, department?: Department) {
+    const res = await fetch(`/api/employees/${id}/current-department`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ department: department ?? null }),
+    });
+    if (!res.ok) {
+      setErrorMessage("応援設定の変更に失敗しました");
+      return;
+    }
+    await refresh();
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
       {errorMessage && (
@@ -148,8 +163,15 @@ export function EmployeeAdmin({
                   />
                 ) : (
                   <>
-                    <span className="flex-1 text-lg font-semibold text-slate-900">
-                      {employee.name}
+                    <span className="flex flex-1 flex-col">
+                      <span className="text-lg font-semibold text-slate-900">
+                        {employee.name}
+                      </span>
+                      {employee.currentDepartment !== employee.homeDepartment && (
+                        <span className="text-sm font-bold text-orange-600">
+                          応援中（本来は{DEPARTMENT_LABEL[employee.homeDepartment]}）
+                        </span>
+                      )}
                     </span>
                     <button
                       type="button"
@@ -167,6 +189,29 @@ export function EmployeeAdmin({
                     >
                       ↓
                     </button>
+                    {employee.currentDepartment !== employee.homeDepartment ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSetSupport(employee.id)}
+                        className="rounded-md bg-orange-200 px-3 py-2 text-lg font-bold"
+                      >
+                        応援解除
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSetSupport(
+                            employee.id,
+                            employee.homeDepartment === "DOBOKU" ? "UNYU" : "DOBOKU"
+                          )
+                        }
+                        className="rounded-md bg-slate-200 px-3 py-2 text-lg font-bold"
+                      >
+                        {DEPARTMENT_LABEL[employee.homeDepartment === "DOBOKU" ? "UNYU" : "DOBOKU"]}
+                        へ応援
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setEditingId(employee.id)}
@@ -205,7 +250,7 @@ function EditRow({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(employee.name);
-  const [department, setDepartment] = useState<Department>(employee.currentDepartment);
+  const [department, setDepartment] = useState<Department>(employee.homeDepartment);
 
   return (
     <>
@@ -215,14 +260,17 @@ function EditRow({
         onChange={(e) => setName(e.target.value)}
         className="flex-1 rounded-lg border-2 border-slate-300 px-3 py-2 text-lg"
       />
-      <select
-        value={department}
-        onChange={(e) => setDepartment(e.target.value as Department)}
-        className="rounded-lg border-2 border-slate-300 px-3 py-2 text-lg"
-      >
-        <option value="DOBOKU">土木</option>
-        <option value="UNYU">運輸</option>
-      </select>
+      <label className="flex items-center gap-1 text-sm text-slate-500">
+        本来の所属
+        <select
+          value={department}
+          onChange={(e) => setDepartment(e.target.value as Department)}
+          className="rounded-lg border-2 border-slate-300 px-3 py-2 text-lg text-slate-900"
+        >
+          <option value="DOBOKU">土木</option>
+          <option value="UNYU">運輸</option>
+        </select>
+      </label>
       <button
         type="button"
         onClick={() => onSave(employee.id, name, department)}
