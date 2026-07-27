@@ -1,0 +1,55 @@
+// KoeHaisha フェーズ1: 出欠札のデジタル化
+// 詳細は docs/02-phase1-design.md を参照
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Department {
+  DOBOKU // 土木
+  UNYU // 運輸
+}
+
+model Status {
+  id        String   @id
+  label     String
+  color     String
+  sortOrder Int      @map("sort_order")
+  employees Employee[]
+  history   StatusHistory[] @relation("ToStatus")
+  historyFrom StatusHistory[] @relation("FromStatus")
+
+  @@map("statuses")
+}
+
+model Employee {
+  id            String     @id @default(uuid())
+  name          String
+  department    Department
+  displayOrder  Int        @map("display_order")
+  isActive      Boolean    @default(true) @map("is_active")
+  currentStatus   Status   @relation(fields: [currentStatusId], references: [id])
+  currentStatusId String   @map("current_status_id")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  history       StatusHistory[]
+
+  @@map("employees")
+}
+
+model StatusHistory {
+  id            String   @id @default(uuid())
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  employeeId    String   @map("employee_id")
+  fromStatus    Status?  @relation("FromStatus", fields: [fromStatusId], references: [id])
+  fromStatusId  String?  @map("from_status_id")
+  toStatus      Status   @relation("ToStatus", fields: [toStatusId], references: [id])
+  toStatusId    String   @map("to_status_id")
+  changedAt     DateTime @default(now()) @map("changed_at")
+
+  @@map("status_history")
+}
