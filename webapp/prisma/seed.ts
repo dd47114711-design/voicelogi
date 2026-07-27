@@ -7,12 +7,12 @@ const adapter = new PrismaBetterSqlite3({
 const prisma = new PrismaClient({ adapter });
 
 const STATUSES = [
-  { id: "shukkin", label: "出勤", color: "#FFFFFF", sortOrder: 1 },
-  { id: "genba", label: "現場", color: "#3B82F6", sortOrder: 2 },
-  { id: "kuusha", label: "空車", color: "#22C55E", sortOrder: 3 },
-  { id: "yasumi", label: "休み", color: "#EF4444", sortOrder: 4 },
-  { id: "seibi", label: "整備", color: "#F97316", sortOrder: 5 },
-  { id: "sonota", label: "その他", color: "#9CA3AF", sortOrder: 6 },
+  { id: "shukkin", label: "出勤", color: "#FFFFFF", icon: "⚪", sortOrder: 1 },
+  { id: "genba", label: "現場", color: "#3B82F6", icon: "🔵", sortOrder: 2 },
+  { id: "kuusha", label: "空車", color: "#22C55E", icon: "🟢", sortOrder: 3 },
+  { id: "yasumi", label: "休み", color: "#EF4444", icon: "🔴", sortOrder: 4 },
+  { id: "seibi", label: "整備", color: "#F97316", icon: "🟠", sortOrder: 5 },
+  { id: "sonota", label: "その他", color: "#9CA3AF", icon: "⚫", sortOrder: 6 },
 ] as const;
 
 // 出欠札ボードの写真から読み取った氏名・部門・並び順。
@@ -64,7 +64,12 @@ async function main() {
   for (const status of STATUSES) {
     await prisma.status.upsert({
       where: { id: status.id },
-      update: { label: status.label, color: status.color, sortOrder: status.sortOrder },
+      update: {
+        label: status.label,
+        color: status.color,
+        icon: status.icon,
+        sortOrder: status.sortOrder,
+      },
       create: status,
     });
   }

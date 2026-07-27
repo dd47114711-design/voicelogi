@@ -4,6 +4,7 @@ export type StatusDto = {
   id: string;
   label: string;
   color: string;
+  icon: string;
   sortOrder: number;
 };
 

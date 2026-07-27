@@ -19,6 +19,7 @@ model Status {
   id        String   @id
   label     String
   color     String
+  icon      String   @default("⚪")
   sortOrder Int      @map("sort_order")
   employees Employee[]
   history   StatusHistory[] @relation("ToStatus")

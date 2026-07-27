@@ -77,8 +77,18 @@ export function Board({
         </div>
       )}
 
-      <DepartmentSection title="土木" employees={doboku} onTap={setSelected} />
-      <DepartmentSection title="運輸" employees={unyu} onTap={setSelected} />
+      <DepartmentSection
+        title="土木"
+        department="DOBOKU"
+        employees={doboku}
+        onTap={setSelected}
+      />
+      <DepartmentSection
+        title="運輸"
+        department="UNYU"
+        employees={unyu}
+        onTap={setSelected}
+      />
       <RestArea employees={resting} onTap={setSelected} />
 
       {selected && (
