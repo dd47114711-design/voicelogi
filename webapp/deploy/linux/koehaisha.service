@@ -1,0 +1,13 @@
+[Unit]
+Description=KoeHaisha (出欠札ボード)
+After=network.target
+
+[Service]
+# 実際の配置場所に合わせて書き換える
+WorkingDirectory=/home/pi/voicelogi/webapp
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

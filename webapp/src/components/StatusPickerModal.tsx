@@ -32,7 +32,7 @@ export function StatusPickerModal({
               key={status.id}
               type="button"
               onClick={() => onChoose(employee, status)}
-              className="flex h-28 items-center justify-center gap-2 rounded-xl border-4 border-slate-800/70 text-3xl font-bold shadow active:scale-95 transition-transform"
+              className="flex h-32 items-center justify-center gap-2 rounded-xl border-4 border-slate-800/70 text-4xl font-bold shadow active:scale-95 transition-transform"
               style={{
                 backgroundColor: status.color,
                 color: readableTextColor(status.color),

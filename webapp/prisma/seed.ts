@@ -11,8 +11,7 @@ const STATUSES = [
   { id: "genba", label: "現場", color: "#3B82F6", icon: "🔵", sortOrder: 2 },
   { id: "kuusha", label: "空車", color: "#22C55E", icon: "🟢", sortOrder: 3 },
   { id: "yasumi", label: "休み", color: "#EF4444", icon: "🔴", sortOrder: 4 },
-  { id: "seibi", label: "整備", color: "#F97316", icon: "🟠", sortOrder: 5 },
-  { id: "sonota", label: "その他", color: "#9CA3AF", icon: "⚫", sortOrder: 6 },
+  { id: "sonota", label: "その他", color: "#9CA3AF", icon: "⚫", sortOrder: 5 },
 ] as const;
 
 // 出欠札ボードの写真から読み取った氏名・部門・並び順。
@@ -82,7 +81,8 @@ async function main() {
       create: {
         id: `seed-${i}`,
         name: employee.name,
-        department: employee.department,
+        homeDepartment: employee.department,
+        currentDepartment: employee.department,
         displayOrder: i,
         currentStatusId: "shukkin",
       },

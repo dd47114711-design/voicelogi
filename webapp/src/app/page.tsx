@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Board } from "@/components/Board";
 
@@ -25,7 +26,12 @@ export default async function Home() {
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
           KoeHaisha
         </h1>
-        <span className="text-xl font-bold text-slate-600">{formatToday()}</span>
+        <div className="flex items-center gap-4">
+          <span className="text-xl font-bold text-slate-600">{formatToday()}</span>
+          <Link href="/admin" className="text-xs text-slate-300">
+            管理
+          </Link>
+        </div>
       </header>
       <Board initialEmployees={employees} statuses={statuses} />
     </div>

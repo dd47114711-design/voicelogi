@@ -45,3 +45,4 @@ next-env.d.ts
 # sqlite database (実データが入るため、リポジトリには含めない)
 *.db
 *.db-journal
+/backups/

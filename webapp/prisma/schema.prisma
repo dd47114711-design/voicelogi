@@ -29,15 +29,20 @@ model Status {
 }
 
 model Employee {
-  id            String     @id @default(uuid())
-  name          String
-  department    Department
-  displayOrder  Int        @map("display_order")
-  isActive      Boolean    @default(true) @map("is_active")
-  currentStatus   Status   @relation(fields: [currentStatusId], references: [id])
-  currentStatusId String   @map("current_status_id")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
-  history       StatusHistory[]
+  id                 String     @id @default(uuid())
+  name               String
+  // 本来の所属(人事上の所属、基本的に変わらない)
+  homeDepartment     Department @map("home_department")
+  // 当日ボードに表示する所属。通常は homeDepartment と同じ値。
+  // 応援等で部門をまたぐ将来ニーズのため分離しているが、
+  // フェーズ1では社員管理画面での編集でのみ変更する。
+  currentDepartment  Department @map("current_department")
+  displayOrder       Int        @map("display_order")
+  isActive           Boolean    @default(true) @map("is_active")
+  currentStatus      Status     @relation(fields: [currentStatusId], references: [id])
+  currentStatusId    String     @map("current_status_id")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  history            StatusHistory[]
 
   @@map("employees")
 }

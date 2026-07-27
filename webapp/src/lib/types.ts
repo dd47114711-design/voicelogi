@@ -11,7 +11,8 @@ export type StatusDto = {
 export type EmployeeDto = {
   id: string;
   name: string;
-  department: Department;
+  homeDepartment: Department;
+  currentDepartment: Department;
   displayOrder: number;
   currentStatusId: string;
   currentStatus: StatusDto;
