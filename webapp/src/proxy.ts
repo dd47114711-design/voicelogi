@@ -10,6 +10,8 @@ function needsAuth(pathname: string, method: string): boolean {
   }
   if (/^\/api\/employees\/[^/]+\/reorder$/.test(pathname)) return true;
   if (/^\/api\/employees\/[^/]+\/current-department$/.test(pathname)) return true;
+  if (/^\/api\/employees\/[^/]+\/restore$/.test(pathname)) return true;
+  if (pathname === "/api/employees/deleted") return true;
   return false;
 }
 

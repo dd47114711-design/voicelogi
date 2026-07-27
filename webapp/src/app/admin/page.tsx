@@ -5,11 +5,18 @@ import { EmployeeAdmin } from "@/components/admin/EmployeeAdmin";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const employees = await prisma.employee.findMany({
-    where: { isActive: true },
-    orderBy: { displayOrder: "asc" },
-    include: { currentStatus: true },
-  });
+  const [employees, deletedEmployees] = await Promise.all([
+    prisma.employee.findMany({
+      where: { isActive: true },
+      orderBy: { displayOrder: "asc" },
+      include: { currentStatus: true },
+    }),
+    prisma.employee.findMany({
+      where: { isActive: false },
+      orderBy: { updatedAt: "desc" },
+      include: { currentStatus: true },
+    }),
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -21,7 +28,7 @@ export default async function AdminPage() {
           出欠札ボードに戻る
         </Link>
       </header>
-      <EmployeeAdmin initialEmployees={employees} />
+      <EmployeeAdmin initialEmployees={employees} initialDeletedEmployees={deletedEmployees} />
     </div>
   );
 }

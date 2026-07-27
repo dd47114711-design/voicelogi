@@ -10,10 +10,13 @@ const DEPARTMENT_LABEL: Record<Department, string> = {
 
 export function EmployeeAdmin({
   initialEmployees,
+  initialDeletedEmployees,
 }: {
   initialEmployees: EmployeeDto[];
+  initialDeletedEmployees: EmployeeDto[];
 }) {
   const [employees, setEmployees] = useState(initialEmployees);
+  const [deletedEmployees, setDeletedEmployees] = useState(initialDeletedEmployees);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newDepartment, setNewDepartment] = useState<Department>("UNYU");
@@ -28,9 +31,14 @@ export function EmployeeAdmin({
   }, [employees]);
 
   async function refresh() {
-    const res = await fetch("/api/employees");
-    const data = await res.json();
-    setEmployees(data.employees);
+    const [activeRes, deletedRes] = await Promise.all([
+      fetch("/api/employees"),
+      fetch("/api/employees/deleted"),
+    ]);
+    const active = await activeRes.json();
+    const deleted = await deletedRes.json();
+    setEmployees(active.employees);
+    setDeletedEmployees(deleted.employees);
   }
 
   async function handleAdd() {
@@ -100,6 +108,15 @@ export function EmployeeAdmin({
     });
     if (!res.ok) {
       setErrorMessage("応援設定の変更に失敗しました");
+      return;
+    }
+    await refresh();
+  }
+
+  async function handleRestore(id: string) {
+    const res = await fetch(`/api/employees/${id}/restore`, { method: "PATCH" });
+    if (!res.ok) {
+      setErrorMessage("復活に失敗しました");
       return;
     }
     await refresh();
@@ -236,6 +253,32 @@ export function EmployeeAdmin({
           </ul>
         </section>
       ))}
+
+      <section className="mb-6 rounded-2xl border-4 border-dashed border-slate-300 bg-slate-50 p-4">
+        <h2 className="mb-3 text-xl font-bold text-slate-600">削除済み社員</h2>
+        <ul className="flex flex-col gap-2">
+          {deletedEmployees.map((employee) => (
+            <li
+              key={employee.id}
+              className="flex items-center gap-2 rounded-lg border-2 border-slate-200 bg-white p-2"
+            >
+              <span className="flex-1 text-lg font-semibold text-slate-500">
+                {employee.name}（{DEPARTMENT_LABEL[employee.homeDepartment]}）
+              </span>
+              <button
+                type="button"
+                onClick={() => handleRestore(employee.id)}
+                className="rounded-md bg-green-200 px-3 py-2 text-lg font-bold"
+              >
+                復活
+              </button>
+            </li>
+          ))}
+          {deletedEmployees.length === 0 && (
+            <li className="text-slate-400">削除済みの社員はいません</li>
+          )}
+        </ul>
+      </section>
     </div>
   );
 }
