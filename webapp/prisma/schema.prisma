@@ -15,6 +15,21 @@ enum Department {
   UNYU // 運輸
 }
 
+// 現場の業務区分。社員の Department とは無関係の独立した分類。
+enum WorkCategory {
+  DOBOKU // 土木
+  UNYU // 運輸
+  HOSO // 舗装
+  SONOTA // その他
+}
+
+// 現場の発注区分(誰が発注したか)。業務区分と組み合わせて使う。
+enum OrderCategory {
+  KOKYO // 公共
+  MINKAN // 民間
+  FUMEI // 不明
+}
+
 model Status {
   id        String   @id
   label     String
@@ -58,4 +73,52 @@ model StatusHistory {
   changedAt     DateTime @default(now()) @map("changed_at")
 
   @@map("status_history")
+}
+
+// ==== フェーズ2A: 現場マスター ====
+// 詳細は docs/07-phase2-design-v2.md を参照
+
+model Client {
+  id       String  @id @default(uuid())
+  name     String
+  isActive Boolean @default(true) @map("is_active")
+  sites    Site[]
+
+  @@map("clients")
+}
+
+model Site {
+  id            String        @id @default(uuid())
+  client        Client        @relation(fields: [clientId], references: [id])
+  clientId      String        @map("client_id")
+  name          String
+  workCategory  WorkCategory  @map("work_category")
+  orderCategory OrderCategory @map("order_category")
+  notes         String?
+  isActive      Boolean       @default(true) @map("is_active")
+  needsReview   Boolean       @default(false) @map("needs_review")
+  reviewReason  String?       @map("review_reason")
+  reviewedAt    DateTime?     @map("reviewed_at")
+  prices        SitePrice[]
+
+  @@map("sites")
+}
+
+model SitePrice {
+  id           String    @id @default(uuid())
+  site         Site      @relation(fields: [siteId], references: [id])
+  siteId       String    @map("site_id")
+  // 車種(例: 10tダンプ, 4t車)。null = 車種を問わない単価。
+  vehicleType  String?   @map("vehicle_type")
+  dayPrice     Int?      @map("day_price")
+  nightPrice   Int?      @map("night_price")
+  otherPrice   Int?      @map("other_price")
+  validFrom    DateTime? @map("valid_from")
+  validTo      DateTime? @map("valid_to")
+  notes        String?
+  needsReview  Boolean   @default(false) @map("needs_review")
+  reviewReason String?   @map("review_reason")
+  reviewedAt   DateTime? @map("reviewed_at")
+
+  @@map("site_prices")
 }
