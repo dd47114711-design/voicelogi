@@ -52,7 +52,47 @@
     }
     // 旧バージョンのデータに出退勤記録が無い場合は追加しておく
     if (!loaded.attendanceLogs) loaded.attendanceLogs = [];
+    if (migrateAttendanceLogs(loaded)) Storage.saveState(loaded);
     return loaded;
+  }
+
+  // 旧形式(1人1日1レコードで clockIn/clockOut を上書き保存)のattendanceLogsを、
+  // 新形式(出勤・退勤タップ毎に1件追加するイベントログ)へ変換する。
+  // 既に新形式のレコードはそのまま残し、人員・現場・車両など他のデータには触れない。
+  function migrateAttendanceLogs(loaded) {
+    var needsMigration = loaded.attendanceLogs.some(function (r) { return !r.action; });
+    if (!needsMigration) return false;
+    var migrated = [];
+    loaded.attendanceLogs.forEach(function (r) {
+      if (r.action) { migrated.push(r); return; }
+      var deptLabel = DEPT_LABELS[r.department] || r.department;
+      if (r.clockIn) {
+        migrated.push({
+          id: r.id + '_in',
+          personId: r.staffId,
+          personName: r.staffName,
+          department: deptLabel,
+          action: 'clockIn',
+          timestamp: r.clockIn,
+          date: r.date,
+          createdAt: r.clockIn
+        });
+      }
+      if (r.clockOut) {
+        migrated.push({
+          id: r.id + '_out',
+          personId: r.staffId,
+          personName: r.staffName,
+          department: deptLabel,
+          action: 'clockOut',
+          timestamp: r.clockOut,
+          date: r.date,
+          createdAt: r.clockOut
+        });
+      }
+    });
+    loaded.attendanceLogs = migrated;
+    return true;
   }
 
   function persist() {
@@ -107,6 +147,19 @@
     return hh + '時間' + pad2(mm) + '分';
   }
 
+  // ローカルタイムゾーンのオフセット付きISO8601文字列を作る
+  // (例: 2026-07-30T07:31:15+09:00)。打刻記録はこの形式で保存する。
+  function toLocalISOString(d) {
+    var offsetMin = -d.getTimezoneOffset();
+    var sign = offsetMin >= 0 ? '+' : '-';
+    var abs = Math.abs(offsetMin);
+    var offH = pad2(Math.floor(abs / 60));
+    var offM = pad2(abs % 60);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+      'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()) +
+      sign + offH + ':' + offM;
+  }
+
   function updateClock() {
     var now = new Date();
     var timeEl = document.getElementById('clock-time');
@@ -148,29 +201,54 @@
   // ============================================================
   // 状態変更(すべての変更はここを通り、保存 + 再描画する)
   // ============================================================
+  // 出勤・退勤の確定処理。
+  // 1.対象者を特定 → 2.状態を更新 → 3.現在日時を取得 →
+  // 4.イベントログへ追加(過去のイベントは上書きしない) → 5.保存 →
+  // 6.画面へ反映 → 7.記録完了メッセージを表示、の順で行う。
   function setAttendance(staffId, status) {
     var s = findStaff(staffId);
     if (!s) return;
     s.attendance = status;
-    recordAttendanceEvent(s, status === 'present' ? 'in' : 'out');
+
+    var now = new Date();
+    var timestamp = toLocalISOString(now);
+    var action = status === 'present' ? 'clockIn' : 'clockOut';
+    state.attendanceLogs.push({
+      id: genId('log'),
+      personId: s.id,
+      personName: s.name,
+      department: DEPT_LABELS[s.department] || s.department,
+      action: action,
+      timestamp: timestamp,
+      date: formatYMD(now),
+      createdAt: timestamp
+    });
+
     persist();
     renderAll();
+    showToast(s.name, (status === 'present' ? '出勤' : '退勤') + ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + 'を記録しました');
   }
 
-  // その日の出勤・退勤時刻を記録する(CSV出力用)。
-  // 同じ人・同じ日のタップは上書きし、最後にタップした時刻を採用する。
-  function recordAttendanceEvent(staff, type) {
-    var now = new Date();
-    var dateStr = formatYMD(now);
-    var rec = state.attendanceLogs.find(function (r) { return r.staffId === staff.id && r.date === dateStr; });
-    if (!rec) {
-      rec = { id: genId('log'), date: dateStr, staffId: staff.id, staffName: staff.name, department: staff.department, clockIn: null, clockOut: null };
-      state.attendanceLogs.push(rec);
-    }
-    rec.staffName = staff.name;
-    rec.department = staff.department;
-    if (type === 'in') rec.clockIn = now.toISOString();
-    if (type === 'out') rec.clockOut = now.toISOString();
+  // ============================================================
+  // 記録完了トースト(数秒で自動的に消える)
+  // ============================================================
+  var toastTimer = null;
+  function showToast(name, message) {
+    var existing = document.getElementById('toast');
+    if (existing) existing.remove();
+    if (toastTimer) clearTimeout(toastTimer);
+
+    var toast = h('div', { className: 'toast', attrs: { id: 'toast' } }, [
+      h('div', { className: 'toast-name', text: name }),
+      h('div', { className: 'toast-message', text: message })
+    ]);
+    document.body.appendChild(toast);
+    requestAnimationFrame(function () { toast.classList.add('toast-show'); });
+
+    toastTimer = setTimeout(function () {
+      toast.classList.remove('toast-show');
+      setTimeout(function () { toast.remove(); }, 300);
+    }, 2800);
   }
 
   function setStaffSite(staffId, siteId) {
@@ -342,32 +420,64 @@
   // ============================================================
   function openAttendanceModal(staffId) {
     openModal(function (panel, close) {
-      var s = findStaff(staffId);
-      panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
-
-      var body = h('div', { className: 'modal-body big-choice-list' });
-
-      body.appendChild(h('button', {
-        className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
-        attrs: { type: 'button' },
-        onClick: function () { setAttendance(staffId, 'present'); close(); }
-      }, [
-        h('span', { className: 'choice-text', text: '出勤' }),
-        s.attendance === 'present' ? h('span', { className: 'current-badge', text: '現在' }) : null
-      ]));
-
-      body.appendChild(h('button', {
-        className: 'choice-btn choice-absent' + (s.attendance === 'absent' ? ' is-current' : ''),
-        attrs: { type: 'button' },
-        onClick: function () { setAttendance(staffId, 'absent'); close(); }
-      }, [
-        h('span', { className: 'choice-text', text: '退勤' }),
-        s.attendance === 'absent' ? h('span', { className: 'current-badge', text: '現在' }) : null
-      ]));
-
-      panel.appendChild(body);
-      panel.appendChild(cancelBar(close));
+      buildAttendanceChoiceContent(panel, staffId, close);
     });
+  }
+
+  function buildAttendanceChoiceContent(panel, staffId, close) {
+    panel.innerHTML = '';
+    var s = findStaff(staffId);
+    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
+
+    var body = h('div', { className: 'modal-body big-choice-list' });
+
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
+      attrs: { type: 'button' },
+      onClick: function () { handleAttendanceChoice(panel, staffId, close, 'present'); }
+    }, [
+      h('span', { className: 'choice-text', text: '出勤' }),
+      s.attendance === 'present' ? h('span', { className: 'current-badge', text: '現在' }) : null
+    ]));
+
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-absent' + (s.attendance === 'absent' ? ' is-current' : ''),
+      attrs: { type: 'button' },
+      onClick: function () { handleAttendanceChoice(panel, staffId, close, 'absent'); }
+    }, [
+      h('span', { className: 'choice-text', text: '退勤' }),
+      s.attendance === 'absent' ? h('span', { className: 'current-badge', text: '現在' }) : null
+    ]));
+
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  // 現在と同じ状態を選んだ場合は、誤操作防止のため即記録せず確認を挟む。
+  function handleAttendanceChoice(panel, staffId, close, status) {
+    var s = findStaff(staffId);
+    if (s.attendance === status) {
+      buildAttendanceConfirmContent(panel, staffId, close, status);
+    } else {
+      setAttendance(staffId, status);
+      close();
+    }
+  }
+
+  function buildAttendanceConfirmContent(panel, staffId, close, status) {
+    panel.innerHTML = '';
+    var label = status === 'present' ? '出勤' : '退勤';
+    panel.appendChild(modalHeader('確認', '現在すでに' + label + '状態です。\nもう一度、' + label + '時刻を記録しますか？'));
+
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add',
+      attrs: { type: 'button' },
+      text: '記録する',
+      onClick: function () { setAttendance(staffId, status); close(); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
   }
 
   function cancelBar(close) {
@@ -653,9 +763,11 @@
   }
 
   // ============================================================
-  // 出退勤記録のCSV出力(日次・月次)
+  // 出退勤記録: イベントログの集計とCSV出力(日次・月次)
   // ============================================================
   var CSV_HEADERS = ['日付', '所属', '氏名', '出勤時刻', '退勤時刻', '勤務時間'];
+  var DEPT_ORDER_BY_LABEL = { '土木': 1, '運輸': 2, '共通': 3 };
+  function deptRank(label) { return DEPT_ORDER_BY_LABEL[label] || 9; }
 
   function csvEscape(v) {
     v = (v == null) ? '' : String(v);
@@ -663,17 +775,79 @@
     return v;
   }
 
-  function buildCsv(records) {
+  // 同じ人・同じ日のイベント群から、最初のclockInと最後のclockOutを求める。
+  // イベント自体は一切変更・削除しない(集計はあくまで読み取り専用の計算)。
+  function aggregatePersonDay(events) {
+    var sorted = events.slice().sort(function (a, b) { return a.timestamp < b.timestamp ? -1 : (a.timestamp > b.timestamp ? 1 : 0); });
+    var ins = sorted.filter(function (e) { return e.action === 'clockIn'; });
+    var outs = sorted.filter(function (e) { return e.action === 'clockOut'; });
+    var last = sorted[sorted.length - 1];
+    var staff = findStaff(last.personId);
+    return {
+      date: last.date,
+      personId: last.personId,
+      personName: last.personName,
+      department: last.department,
+      clockInIso: ins.length ? ins[0].timestamp : null,
+      clockOutIso: outs.length ? outs[outs.length - 1].timestamp : null,
+      _order: staff ? (staff.order || 0) : 999
+    };
+  }
+
+  function buildDailyAggregatedRows(dateStr) {
+    var byPerson = {};
+    state.attendanceLogs.forEach(function (r) {
+      if (r.date !== dateStr) return;
+      (byPerson[r.personId] = byPerson[r.personId] || []).push(r);
+    });
+    var rows = Object.keys(byPerson).map(function (personId) { return aggregatePersonDay(byPerson[personId]); });
+    rows.sort(function (a, b) {
+      var dr = deptRank(a.department) - deptRank(b.department);
+      if (dr !== 0) return dr;
+      if (a._order !== b._order) return a._order - b._order;
+      return a.personName < b.personName ? -1 : (a.personName > b.personName ? 1 : 0);
+    });
+    return rows;
+  }
+
+  function buildMonthlyAggregatedRows(year, month) {
+    var prefix = year + '-' + pad2(month) + '-';
+    var byDatePerson = {};
+    state.attendanceLogs.forEach(function (r) {
+      if (r.date.indexOf(prefix) !== 0) return;
+      var key = r.date + '|' + r.personId;
+      (byDatePerson[key] = byDatePerson[key] || []).push(r);
+    });
+    var rows = Object.keys(byDatePerson).map(function (key) { return aggregatePersonDay(byDatePerson[key]); });
+    rows.sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      var dr = deptRank(a.department) - deptRank(b.department);
+      if (dr !== 0) return dr;
+      if (a._order !== b._order) return a._order - b._order;
+      return a.personName < b.personName ? -1 : (a.personName > b.personName ? 1 : 0);
+    });
+    return rows;
+  }
+
+  // 出勤・退勤の両方がある場合だけ勤務時間を算出する。
+  // 退勤が出勤より前(打刻ミス等)の場合は算出せず「要確認」と表示する。
+  function summarizeRow(row) {
+    var clockInStr = row.clockInIso ? formatTimeHM(row.clockInIso) : '';
+    var clockOutStr = row.clockOutIso ? formatTimeHM(row.clockOutIso) : '';
+    var duration = '';
+    if (row.clockInIso && row.clockOutIso) {
+      var startMs = new Date(row.clockInIso).getTime();
+      var endMs = new Date(row.clockOutIso).getTime();
+      duration = endMs < startMs ? '要確認' : formatDurationHM(row.clockInIso, row.clockOutIso);
+    }
+    return { clockInStr: clockInStr, clockOutStr: clockOutStr, duration: duration };
+  }
+
+  function buildCsv(rows) {
     var lines = [CSV_HEADERS.map(csvEscape).join(',')];
-    records.forEach(function (r) {
-      lines.push([
-        r.date,
-        DEPT_LABELS[r.department] || r.department,
-        r.staffName,
-        formatTimeHM(r.clockIn),
-        formatTimeHM(r.clockOut),
-        formatDurationHM(r.clockIn, r.clockOut)
-      ].map(csvEscape).join(','));
+    rows.forEach(function (row) {
+      var sum = summarizeRow(row);
+      lines.push([row.date, row.department, row.personName, sum.clockInStr, sum.clockOutStr, sum.duration].map(csvEscape).join(','));
     });
     return '﻿' + lines.join('\r\n');
   }
@@ -688,36 +862,15 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
-  function getDailyRecords(dateStr) {
-    var list = state.attendanceLogs.filter(function (r) { return r.date === dateStr && (r.clockIn || r.clockOut); });
-    return sortRecordsForExport(list);
-  }
-
-  function getMonthlyRecords(year, month) {
-    var prefix = year + '-' + pad2(month) + '-';
-    var list = state.attendanceLogs.filter(function (r) { return r.date.indexOf(prefix) === 0 && (r.clockIn || r.clockOut); });
-    return sortRecordsForExport(list);
-  }
-
-  function sortRecordsForExport(list) {
-    return list.slice().sort(function (a, b) {
-      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-      if (a.department !== b.department) return a.department < b.department ? -1 : 1;
-      var sa = findStaff(a.staffId), sb = findStaff(b.staffId);
-      return ((sa && sa.order) || 0) - ((sb && sb.order) || 0);
-    });
-  }
-
   function openRecordsModal() {
     openModal(function (panel, close) {
       var today = new Date();
-      buildRecordsContent(panel, close, today, { year: today.getFullYear(), month: today.getMonth() + 1 });
+      buildRecordsContent(panel, close, today, { year: today.getFullYear(), month: today.getMonth() + 1 }, 'summary');
     });
   }
 
   function shiftDate(d, days) {
-    var next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
-    return next;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
   }
 
   function shiftMonth(ym, delta) {
@@ -727,11 +880,11 @@
     return { year: year, month: month };
   }
 
-  function buildRecordsContent(panel, close, dailyDate, monthYm) {
+  function buildRecordsContent(panel, close, dailyDate, monthYm, dailyView) {
     panel.innerHTML = '';
-    panel.appendChild(modalHeader('出退勤記録のダウンロード', '日付・月を選んでCSV(Excelで開けます)をダウンロードします'));
+    panel.appendChild(modalHeader('出退勤記録', '日付・月を選んでCSV(Excelで開けます)をダウンロード、または操作履歴を確認できます'));
 
-    var body = h('div', { className: 'modal-body' });
+    var body = h('div', { className: 'modal-body scroll-list' });
     var statusMsg = h('p', { className: 'download-status' });
 
     // ---- 日次 ----
@@ -739,24 +892,79 @@
     var dailyNav = h('div', { className: 'date-nav-row' }, [
       h('button', {
         className: 'date-nav-btn', text: '◀ 前日', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, -1), monthYm); }
+        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, -1), monthYm, dailyView); }
       }),
       h('div', { className: 'date-display', text: formatDateJP(dailyDate) }),
       h('button', {
         className: 'date-nav-btn', text: '翌日 ▶', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, 1), monthYm); }
+        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, 1), monthYm, dailyView); }
       })
     ]);
     body.appendChild(dailyNav);
+
+    var dateStr = formatYMD(dailyDate);
+
+    var tabRow = h('div', { className: 'tab-row' }, [
+      h('button', {
+        className: 'tab-btn' + (dailyView === 'summary' ? ' is-active' : ''),
+        attrs: { type: 'button' }, text: '日次集計',
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, monthYm, 'summary'); }
+      }),
+      h('button', {
+        className: 'tab-btn' + (dailyView === 'history' ? ' is-active' : ''),
+        attrs: { type: 'button' }, text: '操作履歴',
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, monthYm, 'history'); }
+      })
+    ]);
+    body.appendChild(tabRow);
+
+    if (dailyView === 'history') {
+      var events = state.attendanceLogs.filter(function (r) { return r.date === dateStr; })
+        .slice().sort(function (a, b) { return a.timestamp < b.timestamp ? -1 : (a.timestamp > b.timestamp ? 1 : 0); });
+      if (!events.length) {
+        body.appendChild(h('p', { className: 'record-empty', text: 'この日の操作履歴はありません。' }));
+      } else {
+        events.forEach(function (e) {
+          body.appendChild(h('div', { className: 'history-row' }, [
+            h('span', { className: 'history-time', text: formatTimeHM(e.timestamp) }),
+            h('span', { className: 'history-name', text: e.personName }),
+            h('span', { className: 'history-action history-action-' + e.action, text: e.action === 'clockIn' ? '出勤' : '退勤' })
+          ]));
+        });
+      }
+    } else {
+      var summaryRows = buildDailyAggregatedRows(dateStr);
+      if (!summaryRows.length) {
+        body.appendChild(h('p', { className: 'record-empty', text: 'この日の記録はまだありません。' }));
+      } else {
+        body.appendChild(h('div', { className: 'record-row record-row-header' }, [
+          h('span', { className: 'record-col record-col-name', text: '氏名' }),
+          h('span', { className: 'record-col record-col-dept', text: '所属' }),
+          h('span', { className: 'record-col record-col-time', text: '出勤' }),
+          h('span', { className: 'record-col record-col-time', text: '退勤' }),
+          h('span', { className: 'record-col record-col-dur', text: '勤務時間' })
+        ]));
+        summaryRows.forEach(function (row) {
+          var sum = summarizeRow(row);
+          body.appendChild(h('div', { className: 'record-row' }, [
+            h('span', { className: 'record-col record-col-name', text: row.personName }),
+            h('span', { className: 'record-col record-col-dept', text: row.department }),
+            h('span', { className: 'record-col record-col-time', text: sum.clockInStr }),
+            h('span', { className: 'record-col record-col-time', text: sum.clockOutStr }),
+            h('span', { className: 'record-col record-col-dur' + (sum.duration === '要確認' ? ' is-warning' : ''), text: sum.duration })
+          ]));
+        });
+      }
+    }
+
     body.appendChild(h('button', {
       className: 'choice-btn choice-download',
       attrs: { type: 'button' },
       text: 'この日の記録をCSVダウンロード',
       onClick: function () {
-        var dateStr = formatYMD(dailyDate);
-        var records = getDailyRecords(dateStr);
-        downloadCsv('attendance_' + dateStr + '.csv', buildCsv(records));
-        statusMsg.textContent = records.length ? '✔ ' + dateStr + ' の記録(' + records.length + '件)をダウンロードしました。' : '※ この日の記録はまだありません(0件で出力しました)。';
+        var rows = buildDailyAggregatedRows(dateStr);
+        downloadCsv('attendance_' + dateStr + '.csv', buildCsv(rows));
+        statusMsg.textContent = rows.length ? '✔ ' + dateStr + ' の記録(' + rows.length + '人分)をダウンロードしました。' : '※ この日の記録はまだありません(0件で出力しました)。';
       }
     }));
 
@@ -765,12 +973,12 @@
     var monthNav = h('div', { className: 'date-nav-row' }, [
       h('button', {
         className: 'date-nav-btn', text: '◀ 前月', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, -1)); }
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, -1), dailyView); }
       }),
       h('div', { className: 'date-display', text: monthYm.year + '年' + monthYm.month + '月' }),
       h('button', {
         className: 'date-nav-btn', text: '翌月 ▶', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, 1)); }
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, 1), dailyView); }
       })
     ]);
     body.appendChild(monthNav);
@@ -779,10 +987,10 @@
       attrs: { type: 'button' },
       text: 'この月の記録をCSVダウンロード',
       onClick: function () {
-        var records = getMonthlyRecords(monthYm.year, monthYm.month);
+        var rows = buildMonthlyAggregatedRows(monthYm.year, monthYm.month);
         var label = monthYm.year + '-' + pad2(monthYm.month);
-        downloadCsv('attendance_' + label + '.csv', buildCsv(records));
-        statusMsg.textContent = records.length ? '✔ ' + monthYm.year + '年' + monthYm.month + '月 の記録(' + records.length + '件)をダウンロードしました。' : '※ この月の記録はまだありません(0件で出力しました)。';
+        downloadCsv('attendance_' + label + '.csv', buildCsv(rows));
+        statusMsg.textContent = rows.length ? '✔ ' + monthYm.year + '年' + monthYm.month + '月 の記録(' + rows.length + '件)をダウンロードしました。' : '※ この月の記録はまだありません(0件で出力しました)。';
       }
     }));
 

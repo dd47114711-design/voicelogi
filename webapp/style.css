@@ -224,7 +224,7 @@ button:disabled { cursor: default; }
 }
 .modal-header { flex: 0 0 auto; margin-bottom: 0.7rem; }
 .modal-title { font-size: 1.95rem; margin: 0 0 0.3rem; color: #1b2733; }
-.modal-subtitle { font-size: 1.1rem; color: #707070; margin: 0; }
+.modal-subtitle { font-size: 1.1rem; color: #707070; margin: 0; white-space: pre-line; }
 .current-line { font-size: 1.2rem; font-weight: 700; color: #29486a; margin: 0 0 0.7rem; }
 
 .modal-body {
@@ -421,6 +421,89 @@ button:disabled { cursor: default; }
   min-height: 1.6rem;
   margin: 0.4rem 0 0;
 }
+
+/* ---------------- 日次集計/操作履歴タブ ---------------- */
+.tab-row {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.2rem 0 0.6rem;
+}
+.tab-btn {
+  flex: 1 1 50%;
+  min-height: 56px;
+  border-radius: 10px;
+  border: 2px solid #ccc;
+  background: #f4f4f4;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #555;
+}
+.tab-btn.is-active { background: #1f6fb2; border-color: #1f6fb2; color: #fff; }
+
+.record-empty {
+  font-size: 1.1rem;
+  color: #888;
+  padding: 0.8rem 0.2rem;
+  margin: 0;
+}
+
+.record-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 52px;
+  padding: 0.2rem 0.7rem;
+  border-bottom: 1px solid #e4e4e4;
+  font-size: 1.05rem;
+  color: #222;
+}
+.record-row-header {
+  font-weight: 700;
+  color: #666;
+  font-size: 0.95rem;
+  border-bottom: 2px solid #ccc;
+}
+.record-col-name { flex: 1 1 26%; font-weight: 700; }
+.record-col-dept { flex: 0 0 16%; color: #666; }
+.record-col-time { flex: 0 0 18%; text-align: center; }
+.record-col-dur { flex: 0 0 22%; text-align: center; font-weight: 700; }
+.record-col-dur.is-warning { color: #c0392b; }
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 52px;
+  padding: 0.2rem 0.7rem;
+  border-bottom: 1px solid #e4e4e4;
+  font-size: 1.1rem;
+}
+.history-time { flex: 0 0 22%; font-weight: 700; font-variant-numeric: tabular-nums; }
+.history-name { flex: 1 1 auto; font-weight: 700; }
+.history-action { flex: 0 0 18%; text-align: center; font-weight: 700; padding: 0.15rem 0; border-radius: 8px; }
+.history-action-clockIn { color: #1e8449; background: #eafaf1; }
+.history-action-clockOut { color: #922b21; background: #fdecea; }
+
+/* ---------------- 記録完了トースト ---------------- */
+.toast {
+  position: fixed;
+  top: 118px;
+  left: 50%;
+  transform: translate(-50%, -12px);
+  background: rgba(20, 24, 30, 0.94);
+  color: #fff;
+  padding: 0.9rem 1.6rem;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  text-align: center;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+.toast.toast-show { opacity: 1; transform: translate(-50%, 0); }
+.toast-name { font-size: 1.3rem; font-weight: 800; }
+.toast-message { font-size: 1.1rem; margin-top: 0.15rem; }
 
 /* ---------------- 車両管理 ---------------- */
 .vehicle-admin-item { }
