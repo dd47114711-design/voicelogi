@@ -313,6 +313,22 @@
   }
 
   // ============================================================
+  // 縦書き表示ヘルパー
+  // 実物の札と同じく、名前・現場・ダンプの文字は縦書きで表示する。
+  // 数字の連続(例:「10tダンプ16」の「10」「16」)は縦中横で横向きに
+  // まとめて表示し、実物の札の見た目に近づける。
+  // ============================================================
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function verticalHtml(str) {
+    return escapeHtml(str).replace(/(\d{1,3})/g, '<span class="tcy">$1</span>');
+  }
+
+  // ============================================================
   // メイン画面描画
   // ============================================================
   function renderAll() {
@@ -334,7 +350,7 @@
       className: 'tag tag-name ' + deptClass + ' ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
       attrs: { type: 'button' },
       onClick: function () { openAttendanceModal(s.id); }
-    }, [h('span', { className: 'tag-name-text', text: s.name })]);
+    }, [h('span', { className: 'tag-name-text', html: verticalHtml(s.name) })]);
   }
 
   function siteTag(s) {
@@ -344,8 +360,8 @@
       attrs: { type: 'button' },
       onClick: function () { openSiteModal(s.id); }
     }, [
-      h('span', { className: 'tag-caption', text: '現場' }),
-      h('span', { className: 'tag-value', text: site ? site.name : '現場未定' })
+      h('span', { className: 'tag-caption', html: verticalHtml('現場') }),
+      h('span', { className: 'tag-value', html: verticalHtml(site ? site.name : '現場未定') })
     ]);
   }
 
@@ -358,8 +374,8 @@
       attrs: { type: 'button' },
       onClick: function () { openVehicleModal(s.id); }
     }, [
-      h('span', { className: 'tag-caption', text: 'ダンプ' }),
-      h('span', { className: 'tag-value', text: vehicle ? vehicle.displayName : '未割当' }),
+      h('span', { className: 'tag-caption', html: verticalHtml('ダンプ') }),
+      h('span', { className: 'tag-value', html: verticalHtml(vehicle ? vehicle.displayName : '未割当') }),
       overrideTag
     ]);
   }

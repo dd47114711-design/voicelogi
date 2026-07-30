@@ -11,7 +11,7 @@ html, body {
   margin: 0;
   padding: 0;
   background: #e9e2d3;
-  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  font-family: "Meiryo", "Yu Gothic", "Hiragino Kaku Gothic ProN", "MS Gothic", "IPAGothic", "Noto Sans CJK JP", sans-serif;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -137,28 +137,39 @@ button:disabled { cursor: default; }
 }
 
 .tag {
-  min-width: 128px;
-  width: 128px;
+  min-width: 96px;
+  width: auto;
   height: 208px;
   border: none;
   border-right: 2px solid rgba(0,0,0,0.18);
-  padding: 0.6rem 0.4rem;
+  padding: 0.6rem 0.5rem;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   box-shadow: inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.12);
 }
 .tag-cluster .tag:last-child { border-right: none; }
 
+/* 実物の札と同じく縦書き。数字の連続(.tcy)だけ縦中横で横向きに表示する。 */
+.tag-name-text,
+.tag-caption,
+.tag-value {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  display: inline-block;
+}
+.tcy { text-combine-upright: all; }
+
 .tag-name-text {
-  font-size: 1.55rem;
+  height: 168px;
+  font-size: 1.5rem;
   font-weight: 700;
-  line-height: 1.25;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
 }
 
 /* 出勤(表)=白、退勤(裏)=赤。所属は上部の帯色で見分ける。 */
@@ -172,24 +183,28 @@ button:disabled { cursor: default; }
 .tag-name.is-absent .tag-name-text { color: #fff8f6; }
 
 .tag-info {
-  width: 150px;
+  min-width: 108px;
   background: #f4efe3;
   color: #3a3226;
 }
 .tag-info.is-unset { color: #948a76; }
 .tag-caption {
+  height: 44px;
   font-size: 0.85rem;
   font-weight: 700;
+  line-height: 1.3;
   color: #948a76;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
 }
 .tag-value {
-  font-size: 1.15rem;
+  height: 140px;
+  font-size: 1.1rem;
   font-weight: 700;
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  letter-spacing: 0.05em;
 }
 .tag-badge {
+  writing-mode: horizontal-tb;
   margin-top: 0.15rem;
   font-size: 0.8rem;
   font-weight: 700;
