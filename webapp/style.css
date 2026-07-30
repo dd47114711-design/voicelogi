@@ -10,7 +10,7 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: #dfe4e8;
+  background: #e9e2d3;
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
   -webkit-user-select: none;
   user-select: none;
@@ -39,7 +39,8 @@ button:disabled { cursor: default; }
   align-items: center;
   justify-content: space-between;
   padding: 0.9rem 1.4rem;
-  background: #1b2733;
+  background: linear-gradient(#4a3423, #2e2013 90%);
+  border-bottom: 4px solid #1c1409;
   color: #fff;
 }
 .app-title { font-size: 1.9rem; font-weight: 700; letter-spacing: 0.02em; }
@@ -87,123 +88,103 @@ button:disabled { cursor: default; }
 .dept-doboku .dept-header { background: #d35400; }
 .dept-unyu .dept-header { background: #1f6fb2; }
 
-/* ---------------- 土木部門: カード ---------------- */
-.card-grid {
+/* ---------------- 名札ボード(棚)風レイアウト ---------------- */
+/* 実物の出勤・配車札ボードを模した、木札のような縦長プレートを
+   金属棚に並べたイメージ。1人分のタグ(名前・現場・[ダンプ])は
+   すき間なく横に連結し、複数人分のタグの束を棚のように並べる。 */
+.tag-shelf {
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
-  gap: 0.9rem;
-  padding: 1rem 1.2rem 1.6rem;
-  align-content: start;
-  background: #efe9df;
-}
-
-.staff-card {
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.14);
-  border: 2px solid #e3d8c6;
-  padding: 0.7rem;
   display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 22px 26px;
+  padding: 26px 24px 34px;
+  background-color: #9a9d9f;
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 12px),
+    repeating-linear-gradient(
+      180deg,
+      rgba(0,0,0,0) 0,
+      rgba(0,0,0,0) 234px,
+      rgba(0,0,0,0.22) 234px,
+      rgba(0,0,0,0.32) 238px,
+      rgba(0,0,0,0) 238px
+    );
 }
+.shelf-doboku { background-color: #a89c85; }
+.shelf-unyu { background-color: #8f9599; }
 
-.name-btn {
-  min-height: 72px;
-  border-radius: 10px;
-  border: 2px solid #97a3ad;
-  font-size: 1.7rem;
-  font-weight: 700;
-  width: 100%;
-}
-.name-btn.is-present { background: #ffffff; color: #1b2733; }
-.name-btn.is-absent { background: #c0392b; color: #ffffff; border-color: #922b21; }
-
-.site-btn {
-  min-height: 64px;
-  border-radius: 10px;
-  border: 2px solid #dcd0ba;
-  background: #faf7f1;
+.tag-cluster {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #3a3226;
-  width: 100%;
-}
-.site-btn.is-unset { color: #9a9184; font-weight: 600; }
-.site-label-tag { font-size: 0.95rem; color: #9a9184; font-weight: 600; }
-
-/* ---------------- 運輸部門: 一覧 ---------------- */
-.driver-list-header {
-  flex: 0 0 auto;
-  display: flex;
-  padding: 0.5rem 1.3rem;
-  background: #dbe8f3;
-  font-weight: 700;
-  color: #29486a;
-  font-size: 1.05rem;
-}
-.driver-list-header .col-name { flex: 0 0 24%; }
-.driver-list-header .col-site { flex: 1 1 38%; }
-.driver-list-header .col-dump { flex: 0 0 30%; }
-
-.driver-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 0.7rem 1.2rem 1.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  background: #e6eef5;
-}
-
-.driver-row {
-  display: flex;
-  min-height: 90px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.12);
-  border: 2px solid #cfe0ee;
+  align-items: stretch;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  border-radius: 8px;
   overflow: hidden;
 }
-.driver-row .col { border: none; border-radius: 0; font-size: 1.35rem; font-weight: 700; }
-.col-name { flex: 0 0 24%; }
-.col-site {
-  flex: 1 1 38%;
-  background: #fff;
-  color: #333;
-  border-left: 2px solid #eef2f5;
-}
-.col-site.is-unset { color: #9a9a9a; font-weight: 600; }
-.dump-btn {
-  flex: 0 0 30%;
+
+.tag {
+  min-width: 128px;
+  width: 128px;
+  height: 208px;
   border: none;
-  border-left: 2px solid #eef2f5;
-  background: #fff;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #333;
+  border-right: 2px solid rgba(0,0,0,0.18);
+  padding: 0.6rem 0.4rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.2rem;
+  text-align: center;
+  gap: 0.3rem;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.12);
 }
-.dump-btn.is-unset .dump-value { color: #9a9a9a; font-weight: 600; }
-.dump-tag {
-  font-size: 0.85rem;
-  color: #1f6fb2;
-  background: #e7f0fa;
-  padding: 0.1rem 0.55rem;
-  border-radius: 8px;
+.tag-cluster .tag:last-child { border-right: none; }
+
+.tag-name-text {
+  font-size: 1.55rem;
   font-weight: 700;
+  line-height: 1.25;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* 出勤(表)=白、退勤(裏)=赤。所属は上部の帯色で見分ける。 */
+.tag-name {
+  border-top: 10px solid #97a3ad;
+}
+.tag-name.dept-doboku { border-top-color: #d35400; }
+.tag-name.dept-unyu { border-top-color: #1f6fb2; }
+.tag-name.is-present { background: #fbfaf7; color: #1b2733; }
+.tag-name.is-absent { background: #b6362a; color: #fff8f6; }
+.tag-name.is-absent .tag-name-text { color: #fff8f6; }
+
+.tag-info {
+  width: 150px;
+  background: #f4efe3;
+  color: #3a3226;
+}
+.tag-info.is-unset { color: #948a76; }
+.tag-caption {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #948a76;
+  letter-spacing: 0.05em;
+}
+.tag-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.tag-badge {
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  background: #1f6fb2;
+  padding: 0.1rem 0.5rem;
+  border-radius: 8px;
 }
 
 /* ---------------- モーダル共通 ---------------- */
@@ -379,13 +360,11 @@ button:disabled { cursor: default; }
 .vehicle-admin-item { }
 
 /* ---------------- スクロールバー(タッチ操作向けに太め) ---------------- */
-.card-grid::-webkit-scrollbar,
-.driver-list::-webkit-scrollbar,
+.tag-shelf::-webkit-scrollbar,
 .modal-body::-webkit-scrollbar {
   width: 14px;
 }
-.card-grid::-webkit-scrollbar-thumb,
-.driver-list::-webkit-scrollbar-thumb,
+.tag-shelf::-webkit-scrollbar-thumb,
 .modal-body::-webkit-scrollbar-thumb {
   background: rgba(0,0,0,0.25);
   border-radius: 8px;

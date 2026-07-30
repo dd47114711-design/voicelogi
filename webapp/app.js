@@ -200,29 +200,47 @@
     container.innerHTML = '';
     var list = sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
     list.forEach(function (s) {
-      container.appendChild(buildDobokuCard(s));
+      container.appendChild(buildDobokuTagCluster(s));
     });
   }
 
-  function buildDobokuCard(s) {
-    var nameBtn = h('button', {
-      className: 'name-btn ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
-      text: s.name,
+  function nameTag(s, deptClass) {
+    return h('button', {
+      className: 'tag tag-name ' + deptClass + ' ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
       attrs: { type: 'button' },
       onClick: function () { openAttendanceModal(s.id); }
-    });
+    }, [h('span', { className: 'tag-name-text', text: s.name })]);
+  }
 
+  function siteTag(s) {
     var site = s.todaySiteId ? findSite(s.todaySiteId) : null;
-    var siteBtn = h('button', {
-      className: 'site-btn' + (site ? '' : ' is-unset'),
+    return h('button', {
+      className: 'tag tag-info' + (site ? '' : ' is-unset'),
       attrs: { type: 'button' },
       onClick: function () { openSiteModal(s.id); }
     }, [
-      h('span', { className: 'site-label-tag', text: '現場' }),
-      h('span', { className: 'site-value', text: site ? site.name : '現場未定' })
+      h('span', { className: 'tag-caption', text: '現場' }),
+      h('span', { className: 'tag-value', text: site ? site.name : '現場未定' })
     ]);
+  }
 
-    return h('div', { className: 'staff-card' }, [nameBtn, siteBtn]);
+  function dumpTag(s) {
+    var vehId = effectiveVehicleId(s);
+    var vehicle = vehId ? findVehicle(vehId) : null;
+    var overrideTag = isOverridden(s) && vehId !== s.normalVehicleId ? h('span', { className: 'tag-badge', text: '本日のみ' }) : null;
+    return h('button', {
+      className: 'tag tag-info' + (vehicle ? '' : ' is-unset'),
+      attrs: { type: 'button' },
+      onClick: function () { openVehicleModal(s.id); }
+    }, [
+      h('span', { className: 'tag-caption', text: 'ダンプ' }),
+      h('span', { className: 'tag-value', text: vehicle ? vehicle.displayName : '未割当' }),
+      overrideTag
+    ]);
+  }
+
+  function buildDobokuTagCluster(s) {
+    return h('div', { className: 'tag-cluster' }, [nameTag(s, 'dept-doboku'), siteTag(s)]);
   }
 
   function renderUnyuList() {
@@ -230,39 +248,12 @@
     container.innerHTML = '';
     var list = sortByOrder(state.staff.filter(function (s) { return s.department === 'unyu' && s.active !== false; }));
     list.forEach(function (s) {
-      container.appendChild(buildUnyuRow(s));
+      container.appendChild(buildUnyuTagCluster(s));
     });
   }
 
-  function buildUnyuRow(s) {
-    var nameBtn = h('button', {
-      className: 'name-btn col col-name ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
-      text: s.name,
-      attrs: { type: 'button' },
-      onClick: function () { openAttendanceModal(s.id); }
-    });
-
-    var site = s.todaySiteId ? findSite(s.todaySiteId) : null;
-    var siteBtn = h('button', {
-      className: 'site-btn col col-site' + (site ? '' : ' is-unset'),
-      attrs: { type: 'button' },
-      text: site ? site.name : '現場未定',
-      onClick: function () { openSiteModal(s.id); }
-    });
-
-    var vehId = effectiveVehicleId(s);
-    var vehicle = vehId ? findVehicle(vehId) : null;
-    var overrideTag = isOverridden(s) && vehId !== s.normalVehicleId ? h('span', { className: 'dump-tag', text: '本日のみ' }) : null;
-    var dumpBtn = h('button', {
-      className: 'dump-btn col col-dump' + (vehicle ? '' : ' is-unset'),
-      attrs: { type: 'button' },
-      onClick: function () { openVehicleModal(s.id); }
-    }, [
-      h('span', { className: 'dump-value', text: vehicle ? vehicle.displayName : '未割当' }),
-      overrideTag
-    ]);
-
-    return h('div', { className: 'driver-row' }, [nameBtn, siteBtn, dumpBtn]);
+  function buildUnyuTagCluster(s) {
+    return h('div', { className: 'tag-cluster' }, [nameTag(s, 'dept-unyu'), siteTag(s), dumpTag(s)]);
   }
 
   // ============================================================
