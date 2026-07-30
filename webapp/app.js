@@ -336,13 +336,39 @@
     renderUnyuList();
   }
 
-  function renderDobokuList() {
-    var container = document.getElementById('doboku-list');
-    container.innerHTML = '';
-    var list = sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
+  // 同じ現場の人を隣り合わせに並べる(現場タグは今まで通り人ごとに独立)。
+  // 「一つの現場に何台も配置されている」ことが一目でわかるよう、
+  // 同じ現場のタグは見た目上すき間なく連結して表示する。
+  // 現場未定の人は最後のグループにまとめる。
+  function groupStaffBySite(list) {
+    var groups = {};
     list.forEach(function (s) {
-      container.appendChild(buildDobokuTagCluster(s));
+      var key = s.todaySiteId || 'UNASSIGNED';
+      (groups[key] = groups[key] || []).push(s);
     });
+    var keys = Object.keys(groups);
+    keys.sort(function (a, b) {
+      if (a === 'UNASSIGNED') return 1;
+      if (b === 'UNASSIGNED') return -1;
+      var siteA = findSite(a), siteB = findSite(b);
+      return ((siteA && siteA.order) || 0) - ((siteB && siteB.order) || 0);
+    });
+    return keys.map(function (key) { return sortByOrder(groups[key]); });
+  }
+
+  function renderTagShelf(containerId, list, buildClusterFn) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+    groupStaffBySite(list).forEach(function (members) {
+      var groupEl = h('div', { className: 'site-group' });
+      members.forEach(function (s) { groupEl.appendChild(buildClusterFn(s)); });
+      container.appendChild(groupEl);
+    });
+  }
+
+  function renderDobokuList() {
+    var list = state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; });
+    renderTagShelf('doboku-list', list, buildDobokuTagCluster);
   }
 
   function nameTag(s, deptClass) {
@@ -385,12 +411,8 @@
   }
 
   function renderUnyuList() {
-    var container = document.getElementById('unyu-list');
-    container.innerHTML = '';
-    var list = sortByOrder(state.staff.filter(function (s) { return s.department === 'unyu' && s.active !== false; }));
-    list.forEach(function (s) {
-      container.appendChild(buildUnyuTagCluster(s));
-    });
+    var list = state.staff.filter(function (s) { return s.department === 'unyu' && s.active !== false; });
+    renderTagShelf('unyu-list', list, buildUnyuTagCluster);
   }
 
   function buildUnyuTagCluster(s) {

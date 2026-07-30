@@ -103,7 +103,8 @@ button:disabled { cursor: default; }
 /* ---------------- 名札ボード(棚)風レイアウト ---------------- */
 /* 実物の出勤・配車札ボードを模した、木札のような縦長プレートを
    金属棚に並べたイメージ。1人分のタグ(名前・現場・[ダンプ])は
-   すき間なく横に連結し、複数人分のタグの束を棚のように並べる。 */
+   すき間なく横に連結する。さらに同じ現場の人同士も隣に並べ、
+   すき間なく連結することで「一つの現場に何台も」を一目で表す。 */
 .tag-shelf {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -127,6 +128,14 @@ button:disabled { cursor: default; }
 }
 .shelf-doboku { background-color: #a89c85; }
 .shelf-unyu { background-color: #8f9599; }
+
+/* 同じ現場の人をまとめる単位。中の人数分だけ列(タグの束)が横に増える。
+   画面幅に収まらない場合はグループ内でも折り返す。 */
+.site-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+}
 
 .tag-cluster {
   display: flex;
