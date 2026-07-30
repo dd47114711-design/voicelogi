@@ -454,8 +454,9 @@
     }
 
     if (department === 'unyu') {
+      // 空車判定は部門をまたいで行う(土木の人がダンプに乗っている日もあるため)。
       var usedVehicleIds = {};
-      presentStaff.forEach(function (s) {
+      state.staff.filter(function (s) { return s.attendance === 'present' && s.active !== false; }).forEach(function (s) {
         var vid = effectiveVehicleId(s);
         if (vid) usedVehicleIds[vid] = true;
       });
@@ -485,7 +486,8 @@
   function computeVehicleSummary() {
     var vehicles = state.vehicles.filter(function (v) { return v.active !== false; });
     var usedIds = {};
-    state.staff.filter(function (s) { return s.department === 'unyu' && s.attendance === 'present' && s.active !== false; })
+    // 土木の人が乗っている場合も「使用中」に含めるため、部門を問わず全員を見る。
+    state.staff.filter(function (s) { return s.attendance === 'present' && s.active !== false; })
       .forEach(function (s) { var vid = effectiveVehicleId(s); if (vid) usedIds[vid] = true; });
 
     var counts = { inUse: 0, idle: 0, maintenance: 0, inspection: 0, broken: 0, suspended: 0, unknown: 0 };
@@ -612,7 +614,9 @@
   }
 
   function buildDobokuMember(s) {
-    return h('div', { className: 'tag-cluster' }, [nameTag(s, 'dept-doboku')]);
+    var tags = [nameTag(s, 'dept-doboku')];
+    if (effectiveVehicleId(s)) tags.push(dumpTag(s));
+    return h('div', { className: 'tag-cluster' }, tags);
   }
 
   function buildUnyuMember(s) {
@@ -962,10 +966,14 @@
     panel.innerHTML = '';
     var s = findStaff(staffId);
     var site = s.todaySiteId ? findSite(s.todaySiteId) : null;
+    var vehId = effectiveVehicleId(s);
+    var vehicle = vehId ? findVehicle(vehId) : null;
+    var backHere = function () { buildDobokuMenuContent(panel, staffId, close); };
     panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤・現場の変更を選択してください'));
     panel.appendChild(h('div', {
       className: 'current-line',
-      text: '現在の現場：' + (site ? site.name : '現場未定') + (s.attendance === 'absent' ? '(休み)' : '')
+      text: '現在の現場：' + (site ? site.name : '現場未定') + ' ／ ダンプ：' + (vehicle ? vehicle.displayName : '未割当') +
+        (s.attendance === 'absent' ? '(休み)' : '')
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
@@ -992,7 +1000,14 @@
       className: 'choice-btn choice-move',
       attrs: { type: 'button' },
       text: '現場を変更',
-      onClick: function () { buildSiteModalContent(panel, staffId, close, function () { buildDobokuMenuContent(panel, staffId, close); }); }
+      onClick: function () { buildSiteModalContent(panel, staffId, close, backHere); }
+    }));
+
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move',
+      attrs: { type: 'button' },
+      text: vehicle ? 'ダンプを変更' : 'ダンプを選択',
+      onClick: function () { buildVehicleSelectContent(panel, staffId, close, backHere); }
     }));
 
     body.appendChild(h('button', {
