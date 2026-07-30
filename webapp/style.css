@@ -1,0 +1,392 @@
+/* ===================================================================
+   出勤・配車ボード スタイル
+   32インチ縦型タッチモニター(基準1080×1920)を前提とした
+   大きな文字・大きなタップ領域のデザイン。
+=================================================================== */
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #dfe4e8;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active { filter: brightness(0.95); }
+button:disabled { cursor: default; }
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---------------- ヘッダー ---------------- */
+.app-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.4rem;
+  background: #1b2733;
+  color: #fff;
+}
+.app-title { font-size: 1.9rem; font-weight: 700; letter-spacing: 0.02em; }
+.header-right { display: flex; align-items: center; gap: 0.9rem; }
+.clock { font-size: 1.2rem; opacity: 0.9; margin-right: 0.4rem; white-space: nowrap; }
+.header-btn {
+  min-height: 56px;
+  padding: 0 1.3rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  background: #33465c;
+  color: #fff;
+}
+.header-btn:active { background: #4a6180; }
+
+/* ---------------- 全体レイアウト ---------------- */
+#board {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dept-section {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dept-doboku { flex: 0 1 38%; min-height: 210px; }
+.dept-unyu { flex: 1 1 62%; }
+
+.dept-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1.3rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #fff;
+}
+.dept-icon { font-size: 1.7rem; }
+.dept-doboku .dept-header { background: #d35400; }
+.dept-unyu .dept-header { background: #1f6fb2; }
+
+/* ---------------- 土木部門: カード ---------------- */
+.card-grid {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  gap: 0.9rem;
+  padding: 1rem 1.2rem 1.6rem;
+  align-content: start;
+  background: #efe9df;
+}
+
+.staff-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.14);
+  border: 2px solid #e3d8c6;
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.name-btn {
+  min-height: 72px;
+  border-radius: 10px;
+  border: 2px solid #97a3ad;
+  font-size: 1.7rem;
+  font-weight: 700;
+  width: 100%;
+}
+.name-btn.is-present { background: #ffffff; color: #1b2733; }
+.name-btn.is-absent { background: #c0392b; color: #ffffff; border-color: #922b21; }
+
+.site-btn {
+  min-height: 64px;
+  border-radius: 10px;
+  border: 2px solid #dcd0ba;
+  background: #faf7f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #3a3226;
+  width: 100%;
+}
+.site-btn.is-unset { color: #9a9184; font-weight: 600; }
+.site-label-tag { font-size: 0.95rem; color: #9a9184; font-weight: 600; }
+
+/* ---------------- 運輸部門: 一覧 ---------------- */
+.driver-list-header {
+  flex: 0 0 auto;
+  display: flex;
+  padding: 0.5rem 1.3rem;
+  background: #dbe8f3;
+  font-weight: 700;
+  color: #29486a;
+  font-size: 1.05rem;
+}
+.driver-list-header .col-name { flex: 0 0 24%; }
+.driver-list-header .col-site { flex: 1 1 38%; }
+.driver-list-header .col-dump { flex: 0 0 30%; }
+
+.driver-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.7rem 1.2rem 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: #e6eef5;
+}
+
+.driver-row {
+  display: flex;
+  min-height: 90px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+  border: 2px solid #cfe0ee;
+  overflow: hidden;
+}
+.driver-row .col { border: none; border-radius: 0; font-size: 1.35rem; font-weight: 700; }
+.col-name { flex: 0 0 24%; }
+.col-site {
+  flex: 1 1 38%;
+  background: #fff;
+  color: #333;
+  border-left: 2px solid #eef2f5;
+}
+.col-site.is-unset { color: #9a9a9a; font-weight: 600; }
+.dump-btn {
+  flex: 0 0 30%;
+  border: none;
+  border-left: 2px solid #eef2f5;
+  background: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+}
+.dump-btn.is-unset .dump-value { color: #9a9a9a; font-weight: 600; }
+.dump-tag {
+  font-size: 0.85rem;
+  color: #1f6fb2;
+  background: #e7f0fa;
+  padding: 0.1rem 0.55rem;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+/* ---------------- モーダル共通 ---------------- */
+.modal-root.hidden { display: none; }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 26, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.6rem;
+}
+.modal-panel {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 920px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.6rem;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.35);
+}
+.modal-header { flex: 0 0 auto; margin-bottom: 0.7rem; }
+.modal-title { font-size: 1.95rem; margin: 0 0 0.3rem; color: #1b2733; }
+.modal-subtitle { font-size: 1.1rem; color: #707070; margin: 0; }
+.current-line { font-size: 1.2rem; font-weight: 700; color: #29486a; margin: 0 0 0.7rem; }
+
+.modal-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-height: 0;
+}
+.modal-body.scroll-list { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 0.2rem; }
+
+.list-btn {
+  min-height: 78px;
+  border-radius: 12px;
+  border: 2px solid #ddd;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.2rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #222;
+  width: 100%;
+  flex: 0 0 auto;
+}
+.list-btn-text { flex: 1 1 auto; text-align: left; }
+.list-btn-tag {
+  font-size: 0.95rem;
+  color: #888;
+  margin-right: 0.6rem;
+  background: #eee;
+  padding: 0.15rem 0.55rem;
+  border-radius: 8px;
+}
+.list-btn.is-selected { border-color: #1f6fb2; background: #eaf3fc; }
+.list-btn.is-disabled { opacity: 0.45; }
+.list-btn.normal-item { border-color: #27ae60; background: #f2fbf5; }
+.list-btn.normal-item.is-selected { background: #e2f7e9; }
+
+.current-badge {
+  background: #1f6fb2;
+  color: #fff;
+  font-size: 0.95rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-badge {
+  font-size: 0.95rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 700;
+  margin-right: 0.6rem;
+  color: #fff;
+  white-space: nowrap;
+}
+.status-available { background: #27ae60; }
+.status-inspection { background: #e67e22; }
+.status-maintenance { background: #8e44ad; }
+.status-broken { background: #c0392b; }
+.status-suspended { background: #5d6470; }
+
+.choice-btn {
+  min-height: 90px;
+  border-radius: 14px;
+  border: 2px solid #ccc;
+  background: #fafafa;
+  font-size: 1.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  width: 100%;
+  flex: 0 0 auto;
+}
+.choice-present { background: #fff; border-color: #7f8c99; color: #1b2733; }
+.choice-absent { background: #fdecea; border-color: #c0392b; color: #922b21; }
+.choice-neutral { background: #f4f4f4; color: #444; }
+.choice-add { background: #eaf6ee; border-color: #27ae60; color: #1e8449; margin-top: 0.2rem; }
+.choice-btn.is-current { box-shadow: 0 0 0 4px rgba(31,111,178,0.35) inset; }
+
+.status-choice-available { background: #eafaf1; border-color: #27ae60; color: #1e8449; }
+.status-choice-inspection { background: #fdf2e3; border-color: #e67e22; color: #a75414; }
+.status-choice-maintenance { background: #f5eafb; border-color: #8e44ad; color: #6c3483; }
+.status-choice-broken { background: #fdecea; border-color: #c0392b; color: #922b21; }
+.status-choice-suspended { background: #eee; border-color: #5d6470; color: #444; }
+
+.modal-footer { flex: 0 0 auto; margin-top: 1rem; display: flex; gap: 0.8rem; }
+.modal-footer.two-col > * { flex: 1 1 50%; }
+.cancel-btn {
+  min-height: 64px;
+  border-radius: 12px;
+  border: 2px solid #bbb;
+  background: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #555;
+  flex: 1 1 auto;
+  width: 100%;
+}
+.save-btn {
+  min-height: 64px;
+  border-radius: 12px;
+  border: none;
+  background: #1f6fb2;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  flex: 1 1 auto;
+}
+.save-btn:active { background: #175a94; }
+
+/* ---------------- 新規現場フォーム ---------------- */
+.form-label { font-size: 1.2rem; font-weight: 700; color: #333; margin-top: 0.5rem; }
+.form-input {
+  min-height: 64px;
+  font-size: 1.5rem;
+  padding: 0 1rem;
+  border-radius: 10px;
+  border: 2px solid #ccc;
+  width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.form-error { color: #c0392b; font-weight: 700; font-size: 1.05rem; margin: 0.3rem 0 0; }
+.form-error.hidden { display: none; }
+
+.category-row { display: flex; gap: 0.7rem; margin-top: 0.3rem; }
+.category-btn {
+  flex: 1 1 33%;
+  min-height: 64px;
+  border-radius: 10px;
+  border: 2px solid #ccc;
+  background: #fafafa;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #444;
+}
+.category-btn.is-selected { background: #eaf3fc; border-color: #1f6fb2; color: #1f6fb2; }
+
+/* ---------------- 車両管理 ---------------- */
+.vehicle-admin-item { }
+
+/* ---------------- スクロールバー(タッチ操作向けに太め) ---------------- */
+.card-grid::-webkit-scrollbar,
+.driver-list::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar {
+  width: 14px;
+}
+.card-grid::-webkit-scrollbar-thumb,
+.driver-list::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+}
