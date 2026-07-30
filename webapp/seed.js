@@ -90,27 +90,31 @@
         { id: 'site_1', name: '本社', category: 'common', status: 'active', order: 1, createdAt: '2026-01-01T00:00:00.000Z', usageCount: 0 }
       ],
 
+      // todaySiteId: 運転手が誰も乗っていない状態でも、当日その現場に
+      // 配置されている(駐車している)車両を表すためのフィールド。
+      // 運転手が乗った時点でnullへ戻す(effectiveVehicleIdの逆参照は
+      // app.jsのvehicleCurrentSiteId/findDriverUsingVehicleで解決する)。
       vehicles: [
-        { id: 'v_1', displayName: '10tダンプ1', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 1, active: true },
-        { id: 'v_2', displayName: '10tダンプ2', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 2, active: true },
-        { id: 'v_3', displayName: '10tダンプ3', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 3, active: true },
-        { id: 'v_4', displayName: '10tダンプ4', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 4, active: true },
-        { id: 'v_5', displayName: '10tダンプ5', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 5, active: true },
-        { id: 'v_6', displayName: '10tダンプ6', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 6, active: true },
-        { id: 'v_7', displayName: '10tダンプ7', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 7, active: true },
-        { id: 'v_8', displayName: '10tダンプ8', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 8, active: true },
-        { id: 'v_9', displayName: '10tダンプ9', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 9, active: true },
-        { id: 'v_10', displayName: '10tダンプ10', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 10, active: true },
-        { id: 'v_11', displayName: '10tダンプ11', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 11, active: true },
-        { id: 'v_12', displayName: '10tダンプ12', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 12, active: true },
-        { id: 'v_13', displayName: '10tダンプ13', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 13, active: true },
-        { id: 'v_14', displayName: '10tダンプ14', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 14, active: true },
-        { id: 'v_15', displayName: '10tダンプ15', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 15, active: true },
-        { id: 'v_16', displayName: '10tダンプ16', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 16, active: true },
-        { id: 'v_17', displayName: '10tダンプ17', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 17, active: true },
-        { id: 'v_18', displayName: '10tダンプ18', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 18, active: true },
-        { id: 'v_19', displayName: '10tダンプ19', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 19, active: true },
-        { id: 'v_20', displayName: '4tダンプ3439', plateNumber: '3439', vehicleType: '4tダンプ', status: 'available', order: 20, active: true }
+        { id: 'v_1', displayName: '10tダンプ1', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 1, active: true, todaySiteId: null },
+        { id: 'v_2', displayName: '10tダンプ2', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 2, active: true, todaySiteId: null },
+        { id: 'v_3', displayName: '10tダンプ3', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 3, active: true, todaySiteId: null },
+        { id: 'v_4', displayName: '10tダンプ4', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 4, active: true, todaySiteId: null },
+        { id: 'v_5', displayName: '10tダンプ5', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 5, active: true, todaySiteId: null },
+        { id: 'v_6', displayName: '10tダンプ6', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 6, active: true, todaySiteId: null },
+        { id: 'v_7', displayName: '10tダンプ7', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 7, active: true, todaySiteId: null },
+        { id: 'v_8', displayName: '10tダンプ8', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 8, active: true, todaySiteId: null },
+        { id: 'v_9', displayName: '10tダンプ9', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 9, active: true, todaySiteId: null },
+        { id: 'v_10', displayName: '10tダンプ10', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 10, active: true, todaySiteId: null },
+        { id: 'v_11', displayName: '10tダンプ11', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 11, active: true, todaySiteId: null },
+        { id: 'v_12', displayName: '10tダンプ12', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 12, active: true, todaySiteId: null },
+        { id: 'v_13', displayName: '10tダンプ13', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 13, active: true, todaySiteId: null },
+        { id: 'v_14', displayName: '10tダンプ14', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 14, active: true, todaySiteId: null },
+        { id: 'v_15', displayName: '10tダンプ15', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 15, active: true, todaySiteId: null },
+        { id: 'v_16', displayName: '10tダンプ16', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 16, active: true, todaySiteId: null },
+        { id: 'v_17', displayName: '10tダンプ17', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 17, active: true, todaySiteId: null },
+        { id: 'v_18', displayName: '10tダンプ18', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 18, active: true, todaySiteId: null },
+        { id: 'v_19', displayName: '10tダンプ19', plateNumber: '', vehicleType: '10tダンプ', status: 'available', order: 19, active: true, todaySiteId: null },
+        { id: 'v_20', displayName: '4tダンプ3439', plateNumber: '3439', vehicleType: '4tダンプ', status: 'available', order: 20, active: true, todaySiteId: null }
       ],
 
       // 出退勤の打刻記録(日次・月次CSV出力の元データ)

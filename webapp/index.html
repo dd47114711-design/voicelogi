@@ -30,6 +30,7 @@
       <div class="dept-header">
         <span class="dept-icon">🚧</span>
         <span class="dept-name">土木部門</span>
+        <button id="btn-doboku-dispatch-create" class="dept-action-btn" type="button">＋ 現場配置を作成</button>
       </div>
       <div class="lane-toolbar">
         <button id="btn-doboku-expand-all" class="toolbar-btn" type="button">すべて開く</button>
@@ -42,7 +43,11 @@
       <div class="dept-header">
         <span class="dept-icon">🚚</span>
         <span class="dept-name">運輸部門</span>
-        <button id="btn-dispatch-register" class="dept-action-btn" type="button">＋ 配車登録</button>
+        <div class="dept-header-actions">
+          <button id="btn-dispatch-register" class="dept-action-btn" type="button">＋ 現場配車を作成</button>
+          <button id="btn-unyu-site-edit" class="dept-action-btn dept-action-btn-alt" type="button">既存現場を編集</button>
+          <button id="btn-unyu-vehicle-status" class="dept-action-btn dept-action-btn-alt" type="button">車両状態</button>
+        </div>
       </div>
       <div id="unyu-summary" class="dept-summary-bar"></div>
       <div class="lane-toolbar">

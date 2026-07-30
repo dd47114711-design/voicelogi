@@ -102,8 +102,14 @@ button:disabled { cursor: default; }
 .dept-doboku .dept-header { background: #d35400; }
 .dept-unyu .dept-header { background: #1f6fb2; }
 
-.dept-action-btn {
+.dept-header > .dept-action-btn { margin-left: auto; }
+.dept-header-actions {
   margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.dept-action-btn {
   min-height: 56px;
   padding: 0 1.4rem;
   border: none;
@@ -115,6 +121,11 @@ button:disabled { cursor: default; }
   white-space: nowrap;
 }
 .dept-action-btn:active { background: #219150; }
+.dept-action-btn-alt {
+  background: #33465c;
+  font-size: 1.1rem;
+}
+.dept-action-btn-alt:active { background: #4a6180; }
 
 .dept-summary-bar {
   flex: 0 0 auto;
@@ -216,31 +227,41 @@ button:disabled { cursor: default; }
 .lane-vehicle-broken .lane-header { background: #c0392b; }
 .lane-vehicle-suspended .lane-header { background: #5d6470; }
 
-.lane-members {
+/* 現場グループ: 左＝運転手(作業員)札、中央＝現場名の札、右＝ダンプ札の
+   3カラム。運転手とダンプは1組の小カードに結合せず、それぞれ独立した
+   札として並べる。どちらか一方が無い行(空車・休み等)は、その列ごと
+   自動的に詰める。 */
+.site-group {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 12px 14px;
+  justify-content: center;
+  gap: 18px;
   padding: 14px;
   background-color: #ddd5c1;
   background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 10px);
 }
-.stack-unyu .lane-members { background-color: #ccd4da; }
+.stack-unyu .site-group { background-color: #ccd4da; }
 
-.tag-cluster {
+.driver-tags,
+.vehicle-tags {
+  flex: 1 1 0;
   display: flex;
-  align-items: stretch;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
-  border-radius: 8px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 12px 14px;
+  min-width: 0;
 }
+.driver-tags { justify-content: flex-end; }
+.vehicle-tags { justify-content: flex-start; }
+.driver-tags:empty,
+.vehicle-tags:empty { display: none; }
 
 .tag {
   min-width: 96px;
   width: auto;
   height: 208px;
-  border: none;
-  border-right: 2px solid rgba(0,0,0,0.18);
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
   padding: 0.6rem 0.5rem;
   display: flex;
   flex: 0 0 auto;
@@ -249,9 +270,21 @@ button:disabled { cursor: default; }
   justify-content: center;
   text-align: center;
   gap: 0.35rem;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.12);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.12);
 }
-.tag-cluster .tag:last-child { border-right: none; }
+
+/* 現場名札(中央)。実物の木札を意識した色味で、運転手・ダンプ札とは
+   一目で区別できるようにする。 */
+.tag-site {
+  flex: 0 0 auto;
+  min-width: 128px;
+  background: linear-gradient(#f3e2bd, #e4c78f);
+  color: #4a3115;
+  border-top: 10px solid #a9773b;
+}
+.tag-site .tag-name-text { font-size: 1.55rem; }
+.tag-site-static { cursor: default; }
+.tag-site-static:active { filter: none; }
 
 /* 実物の札と同じく縦書き。数字の連続(.tcy)だけ縦中横で横向きに表示する。 */
 .tag-name-text,
@@ -380,6 +413,25 @@ button:disabled { cursor: default; }
 .list-btn.is-disabled { opacity: 0.45; }
 .list-btn.normal-item { border-color: #27ae60; background: #f2fbf5; }
 .list-btn.normal-item.is-selected { background: #e2f7e9; }
+
+/* 複数選択リスト(配車ウィザード・現場グループ編集) */
+.select-mark {
+  flex: 0 0 auto;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #bbb;
+  margin-right: 0.2rem;
+}
+.select-item.is-selected { border-color: #27ae60; background: #eafaf1; }
+.select-item.is-selected .select-mark { color: #27ae60; }
+
+/* 対応関係の確認画面(行タップでダンプ変更、未割当はタップ不可の表示のみ) */
+.pairing-item.is-unpaired {
+  border-style: dashed;
+  border-color: #c0392b;
+  background: #fdf3f1;
+  color: #922b21;
+}
 
 .current-badge {
   background: #1f6fb2;

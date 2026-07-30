@@ -39,6 +39,15 @@
     document.getElementById('btn-dispatch-register').addEventListener('click', function () {
       openDispatchWizard();
     });
+    document.getElementById('btn-unyu-site-edit').addEventListener('click', function () {
+      openExistingSiteEditPicker('unyu');
+    });
+    document.getElementById('btn-unyu-vehicle-status').addEventListener('click', function () {
+      openVehicleAdmin();
+    });
+    document.getElementById('btn-doboku-dispatch-create').addEventListener('click', function () {
+      openDobokuWizard();
+    });
     document.getElementById('btn-doboku-expand-all').addEventListener('click', function () { setAllLanesOpen('doboku', true); });
     document.getElementById('btn-doboku-collapse-all').addEventListener('click', function () { setAllLanesOpen('doboku', false); });
     document.getElementById('btn-unyu-expand-all').addEventListener('click', function () { setAllLanesOpen('unyu', true); });
@@ -59,7 +68,13 @@
     }
     // 旧バージョンのデータに出退勤記録が無い場合は追加しておく
     if (!loaded.attendanceLogs) loaded.attendanceLogs = [];
-    if (migrateAttendanceLogs(loaded)) Storage.saveState(loaded);
+    var needsSave = migrateAttendanceLogs(loaded);
+    // 旧バージョンの車両データに todaySiteId(運転手なしで現場に駐車中、
+    // の意味を持つフィールド)が無い場合は追加しておく
+    loaded.vehicles.forEach(function (v) {
+      if (typeof v.todaySiteId === 'undefined') { v.todaySiteId = null; needsSave = true; }
+    });
+    if (needsSave) Storage.saveState(loaded);
     return loaded;
   }
 
@@ -279,6 +294,8 @@
     var s = findStaff(staffId);
     if (!s) return;
     s.todayVehicleId = value;
+    var vid = effectiveVehicleId(s);
+    if (vid) claimVehicleForDriver(vid);
     persist();
     renderAll();
   }
@@ -362,6 +379,63 @@
     return !!(driver.todaySiteId && driver.todaySiteId !== targetSiteId);
   }
 
+  // その車両を今日実際に運転している(出勤中の)人がいれば解消する。
+  // 運転手が乗った車両は「駐車中」フラグを持つ必要が無いので同時に消す。
+  function claimVehicleForDriver(vehicleId) {
+    var v = findVehicle(vehicleId);
+    if (v) v.todaySiteId = null;
+  }
+
+  // その車両が「運転手なしで、当日どこかの現場に駐車されている」かどうか。
+  // (運転手が乗っている場合はfindDriverUsingVehicleの方で現場が分かるため、
+  // ここではtodaySiteId単独の意味だけを見る)
+  function isVehicleParkedWithoutDriver(vehicle) {
+    return !!vehicle.todaySiteId && !findDriverUsingVehicle(vehicle.id, null);
+  }
+
+  // 現場に今日いる車両(運転手が乗っている車両＋運転手なしで駐車中の車両)
+  // を求める。土木部門では「その部門の人が乗っている車両」のみを対象とし、
+  // 駐車中扱いの車両(運輸の概念)は対象にしない。
+  function laneVehicles(department, lane) {
+    var ids = {};
+    var ordered = [];
+    function add(id) { if (id && !ids[id]) { ids[id] = true; ordered.push(id); } }
+    (lane.members || []).forEach(function (s) { add(effectiveVehicleId(s)); });
+    if (department === 'unyu' && lane.kind === 'site') {
+      state.vehicles.forEach(function (v) {
+        if (v.active === false || ids[v.id]) return;
+        if (v.todaySiteId === lane.key && !findDriverUsingVehicle(v.id, null)) add(v.id);
+      });
+    }
+    return sortByOrder(ordered.map(findVehicle).filter(Boolean));
+  }
+
+  // 現場を今日「終了」する(その現場に配車されている全員・全車両の割当を解除する)。
+  // 現場マスタ自体は残し、翌日以降も同じ現場名を選び直せるようにする。
+  function endSiteToday(siteId) {
+    state.staff.forEach(function (s) {
+      if (s.todaySiteId === siteId) { s.todaySiteId = null; s.todayVehicleId = 'UNASSIGNED'; }
+    });
+    state.vehicles.forEach(function (v) {
+      if (v.todaySiteId === siteId) v.todaySiteId = null;
+    });
+    persist();
+    renderAll();
+  }
+
+  function renameSite(siteId, newName) {
+    var trimmed = (newName || '').trim();
+    if (!trimmed) return { ok: false, reason: 'empty' };
+    var dup = state.sites.some(function (s) { return s.id !== siteId && s.name === trimmed; });
+    if (dup) return { ok: false, reason: 'duplicate' };
+    var site = findSite(siteId);
+    if (!site) return { ok: false, reason: 'notfound' };
+    site.name = trimmed;
+    persist();
+    renderAll();
+    return { ok: true, site: site };
+  }
+
   // ============================================================
   // 縦書き表示ヘルパー
   // 実物の札と同じく、名前・現場・ダンプの文字は縦書きで表示する。
@@ -387,18 +461,18 @@
   // 表示のときだけ現場ごとにグルーピングする。
   // ============================================================
   function renderAll() {
-    renderDepartment('doboku-list', 'doboku', buildDobokuMember);
-    renderDepartment('unyu-list', 'unyu', buildUnyuMember);
+    renderDepartment('doboku-list', 'doboku');
+    renderDepartment('unyu-list', 'unyu');
     renderVehicleSummaryBar();
   }
 
   var DEPARTMENT_RENDERERS = {
-    doboku: { containerId: 'doboku-list', buildMemberFn: buildDobokuMember },
-    unyu: { containerId: 'unyu-list', buildMemberFn: buildUnyuMember }
+    doboku: { containerId: 'doboku-list' },
+    unyu: { containerId: 'unyu-list' }
   };
   function rerenderDepartment(department) {
     var cfg = DEPARTMENT_RENDERERS[department];
-    renderDepartment(cfg.containerId, department, cfg.buildMemberFn);
+    renderDepartment(cfg.containerId, department);
   }
 
   // ------------------------------------------------------------
@@ -462,7 +536,7 @@
       });
       var vehicles = sortByOrder(state.vehicles.filter(function (v) { return v.active !== false; }));
 
-      var idleVehicles = vehicles.filter(function (v) { return v.status === 'available' && !usedVehicleIds[v.id]; });
+      var idleVehicles = vehicles.filter(function (v) { return v.status === 'available' && !usedVehicleIds[v.id] && !v.todaySiteId; });
       if (idleVehicles.length) {
         lanes.push({ kind: 'vehicle', key: 'idle', label: '空車', vehicles: idleVehicles });
       }
@@ -493,7 +567,7 @@
     var counts = { inUse: 0, idle: 0, maintenance: 0, inspection: 0, broken: 0, suspended: 0, unknown: 0 };
     vehicles.forEach(function (v) {
       if (v.status === 'available') {
-        if (usedIds[v.id]) counts.inUse++; else counts.idle++;
+        if (usedIds[v.id] || v.todaySiteId) counts.inUse++; else counts.idle++;
       } else if (VEHICLE_STATUS_ORDER.indexOf(v.status) !== -1) {
         counts[v.status]++;
       } else {
@@ -527,10 +601,25 @@
     return 'lane-' + lane.kind + '-' + department;
   }
 
-  function buildLaneEl(lane, department, buildMemberFn) {
-    var count = lane.kind === 'vehicle' ? lane.vehicles.length : lane.members.length;
-    var unit = lane.kind === 'vehicle' ? '台' : '人';
+  // ------------------------------------------------------------
+  // 現場グループの表示: 実物の札ボードと同じく、
+  //   左＝運転手(作業員)の名前札を複数、中央＝現場名の札、
+  //   右＝ダンプ札を複数
+  // という3カラムで組み立てる。運転手とダンプは1組の小カードに
+  // 結合しない(タップも札ごとに独立)。
+  // 空車・整備・車検・故障・使用停止・休み・現場未定も同じ3カラム
+  // 様式で表示し(該当しない側は空欄)、実物の札ボードと見た目を揃える。
+  // ------------------------------------------------------------
+  function buildLaneEl(lane, department) {
+    var isVehicleLane = lane.kind === 'vehicle';
+    var vehicles = isVehicleLane ? lane.vehicles : laneVehicles(department, lane);
+    var members = isVehicleLane ? [] : sortByOrder(lane.members);
     var open = isLaneOpen(department, lane.key);
+
+    var countParts = [];
+    if (members.length) countParts.push(members.length + '人');
+    if (vehicles.length) countParts.push(vehicles.length + '台');
+    if (!countParts.length) countParts.push('0');
 
     var header = h('button', {
       className: 'lane-header',
@@ -541,23 +630,26 @@
         h('span', { className: 'lane-chevron', text: open ? '▼' : '▶' }),
         h('span', { className: 'lane-title', text: lane.label })
       ]),
-      h('span', { className: 'lane-count', text: count + unit })
+      h('span', { className: 'lane-count', text: countParts.join(' / ') })
     ]);
 
     var children = [header];
     if (open) {
-      var membersEl = h('div', { className: 'lane-members' });
-      if (lane.kind === 'vehicle') {
-        lane.vehicles.forEach(function (v) { membersEl.appendChild(vehicleOnlyTag(v)); });
-      } else {
-        lane.members.forEach(function (s) { membersEl.appendChild(buildMemberFn(s)); });
-      }
-      children.push(membersEl);
+      var driverCol = h('div', { className: 'driver-tags' });
+      members.forEach(function (s) { driverCol.appendChild(driverTag(s)); });
+
+      var vehicleCol = h('div', { className: 'vehicle-tags' });
+      vehicles.forEach(function (v) {
+        var driver = findDriverUsingVehicle(v.id, null);
+        vehicleCol.appendChild(vehicleTag(v, driver, lane));
+      });
+
+      children.push(h('div', { className: 'site-group' }, [driverCol, siteGroupTag(lane, department), vehicleCol]));
     }
     return h('div', { className: 'site-lane ' + laneColorClass(lane, department) }, children);
   }
 
-  function renderDepartment(containerId, department, buildMemberFn) {
+  function renderDepartment(containerId, department) {
     var container = document.getElementById(containerId);
     container.innerHTML = '';
     var lanes = buildDepartmentLanes(department);
@@ -566,12 +658,14 @@
       return;
     }
     lanes.forEach(function (lane) {
-      container.appendChild(buildLaneEl(lane, department, buildMemberFn));
+      container.appendChild(buildLaneEl(lane, department));
     });
   }
 
   // ---- 個々の札(タグ) ----
-  function nameTag(s, deptClass) {
+  // 運転手(作業員)の名前札。出勤=白、退勤=赤。タップで個別の変更メニューを開く。
+  function driverTag(s) {
+    var deptClass = s.department === 'unyu' ? 'dept-unyu' : 'dept-doboku';
     return h('button', {
       className: 'tag tag-name ' + deptClass + ' ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
       attrs: { type: 'button' },
@@ -582,45 +676,40 @@
     }, [h('span', { className: 'tag-name-text', html: verticalHtml(s.name) })]);
   }
 
-  function dumpTag(s) {
-    var vehId = effectiveVehicleId(s);
-    var vehicle = vehId ? findVehicle(vehId) : null;
-    var overrideTag = isOverridden(s) && vehId !== s.normalVehicleId ? h('span', { className: 'tag-badge', text: '本日のみ' }) : null;
-    var warn = !!(vehicle && vehicle.status !== 'available');
+  // ダンプ(車両)札。現場グループの右側に並ぶ。運転手が乗っていれば
+  // タップでその人の配車編集メニューを開き、運転手なしで駐車中の場合や
+  // 空車・整備等の行にある場合はタップで車両側の操作を開く。
+  function vehicleTag(v, driver, lane) {
+    var warn = v.status !== 'available';
+    var parkedNoDriver = !driver && lane.kind === 'site' && isVehicleParkedWithoutDriver(v);
+    var overrideTag = (driver && isOverridden(driver) && v.id !== driver.normalVehicleId)
+      ? h('span', { className: 'tag-badge', text: '本日のみ' }) : null;
     return h('button', {
-      className: 'tag tag-info' + (vehicle ? '' : ' is-unset') + (warn ? ' is-warning' : ''),
+      className: 'tag tag-info' + (warn ? ' is-warning' : '') + (parkedNoDriver ? ' is-unset' : ''),
       attrs: { type: 'button' },
-      onClick: function () { openDispatchEditMenu(s.id); }
+      onClick: function () {
+        if (driver) { openDispatchEditMenu(driver.id); return; }
+        if (parkedNoDriver) { openParkedVehicleMenu(v.id, lane.key); return; }
+        openVehicleStatusStandalone(v.id);
+      }
     }, [
-      h('span', { className: 'tag-caption', html: verticalHtml('ダンプ') }),
-      h('span', { className: 'tag-value', html: verticalHtml(vehicle ? vehicle.displayName : '未割当') }),
-      warn ? h('span', { className: 'tag-badge tag-badge-warning', text: VEHICLE_STATUS_LABELS[vehicle.status] }) : null,
+      h('span', { className: 'tag-caption', html: verticalHtml(driver ? 'ダンプ' : '車両') }),
+      h('span', { className: 'tag-value', html: verticalHtml(v.displayName) }),
+      warn ? h('span', { className: 'tag-badge tag-badge-warning', text: VEHICLE_STATUS_LABELS[v.status] }) : null,
+      parkedNoDriver ? h('span', { className: 'tag-badge', text: '運転手未定' }) : null,
       overrideTag
     ]);
   }
 
-  // 車両のみの札(空車・整備・車検・故障・使用停止の行で使う)。
-  // タップすると、その車両の状態を直接変更できる。
-  function vehicleOnlyTag(v) {
-    var tag = h('button', {
-      className: 'tag tag-info',
-      attrs: { type: 'button' },
-      onClick: function () { openVehicleStatusStandalone(v.id); }
-    }, [
-      h('span', { className: 'tag-caption', html: verticalHtml('車両') }),
-      h('span', { className: 'tag-value', html: verticalHtml(v.displayName) })
-    ]);
-    return h('div', { className: 'tag-cluster' }, [tag]);
-  }
-
-  function buildDobokuMember(s) {
-    var tags = [nameTag(s, 'dept-doboku')];
-    if (effectiveVehicleId(s)) tags.push(dumpTag(s));
-    return h('div', { className: 'tag-cluster' }, tags);
-  }
-
-  function buildUnyuMember(s) {
-    return h('div', { className: 'tag-cluster' }, [nameTag(s, 'dept-unyu'), dumpTag(s)]);
+  // 現場グループ中央の現場名札。実在の現場(kind==='site')だけタップでき、
+  // その現場グループ全体の編集メニュー(運転手・ダンプの追加/解除等)を開く。
+  function siteGroupTag(lane, department) {
+    var clickable = lane.kind === 'site';
+    return h(clickable ? 'button' : 'div', {
+      className: 'tag tag-site' + (clickable ? '' : ' tag-site-static'),
+      attrs: clickable ? { type: 'button' } : {},
+      onClick: clickable ? function () { openSiteGroupEditMenu(department, lane.key); } : undefined
+    }, [h('span', { className: 'tag-name-text', html: verticalHtml(lane.label) })]);
   }
 
   // ============================================================
@@ -1022,6 +1111,190 @@
   }
 
   // ============================================================
+  // 土木: 現場配置ウィザード(現場を選んで複数人を一括配置する)
+  // ============================================================
+  function openDobokuWizard() {
+    openModal(function (panel, close) {
+      buildDobokuWizardStep1Site(panel, close, { siteId: null, staffIds: [] });
+    });
+  }
+
+  function relevantDobokuSites() {
+    var sites = state.sites.filter(function (site) {
+      return site.status === 'active' && (site.category === 'doboku' || site.category === 'common');
+    });
+    sites.sort(function (a, b) {
+      var diff = (b.usageCount || 0) - (a.usageCount || 0);
+      if (diff !== 0) return diff;
+      return (a.order || 0) - (b.order || 0);
+    });
+    return sites;
+  }
+
+  function buildDobokuWizardStep1Site(panel, close, wizardState) {
+    panel.innerHTML = '';
+    panel.appendChild(modalHeader('現場を選択', '配置する現場をタップしてください'));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+    relevantDobokuSites().forEach(function (site) {
+      body.appendChild(h('button', {
+        className: 'list-btn site-item', attrs: { type: 'button' },
+        onClick: function () { wizardState.siteId = site.id; buildDobokuWizardStep2StaffMulti(panel, close, wizardState); }
+      }, [h('span', { className: 'list-btn-text', text: site.name })]));
+    });
+    body.appendChild(h('button', {
+      className: 'list-btn site-item', attrs: { type: 'button' },
+      onClick: function () { wizardState.siteId = null; buildDobokuWizardStep2StaffMulti(panel, close, wizardState); }
+    }, [h('span', { className: 'list-btn-text', text: '現場未定' })]));
+    panel.appendChild(body);
+
+    panel.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '＋ 新規現場を追加',
+      onClick: function () {
+        buildNewSiteFormCore(panel,
+          function (site) { wizardState.siteId = site.id; buildDobokuWizardStep2StaffMulti(panel, close, wizardState); },
+          function () { buildDobokuWizardStep1Site(panel, close, wizardState); });
+      }
+    }));
+    panel.appendChild(cancelBar(close));
+  }
+
+  function buildDobokuWizardStep2StaffMulti(panel, close, wizardState) {
+    panel.innerHTML = '';
+    var siteLabel = wizardState.siteId ? findSite(wizardState.siteId).name : '現場未定';
+    panel.appendChild(modalHeader('作業員を選択', siteLabel + 'へ配置する作業員をタップして選んでください(複数選択可)'));
+    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + wizardState.staffIds.length + '人' }));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+    var allStaff = sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
+    allStaff.forEach(function (s) {
+      var selected = wizardState.staffIds.indexOf(s.id) !== -1;
+      var sSite = s.todaySiteId ? findSite(s.todaySiteId) : null;
+      body.appendChild(h('button', {
+        className: 'list-btn driver-item select-item' + (selected ? ' is-selected' : '') + (s.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
+        attrs: { type: 'button' },
+        onClick: function () { toggleDobokuWizardStaff(panel, close, wizardState, s); }
+      }, [
+        h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
+        h('span', { className: 'list-btn-text', text: s.name }),
+        h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
+        (sSite && !selected) ? h('span', { className: 'list-btn-tag', text: sSite.name }) : null
+      ]));
+    });
+    panel.appendChild(body);
+
+    var actionRow = h('div', { className: 'modal-footer two-col' });
+    actionRow.appendChild(h('button', { className: 'cancel-btn', text: '全選択解除', attrs: { type: 'button' }, onClick: function () { wizardState.staffIds = []; buildDobokuWizardStep2StaffMulti(panel, close, wizardState); } }));
+    actionRow.appendChild(h('button', { className: 'save-btn', text: '次へ', attrs: { type: 'button' }, onClick: function () { if (wizardState.staffIds.length) buildDobokuWizardConfirm(panel, close, wizardState); } }));
+    panel.appendChild(actionRow);
+
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildDobokuWizardStep1Site(panel, close, wizardState); } }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
+  }
+
+  function toggleDobokuWizardStaff(panel, close, wizardState, s) {
+    var idx = wizardState.staffIds.indexOf(s.id);
+    if (idx !== -1) { wizardState.staffIds.splice(idx, 1); buildDobokuWizardStep2StaffMulti(panel, close, wizardState); return; }
+    if (isDriverAlreadyDispatched(s, wizardState.siteId)) {
+      var site = s.todaySiteId ? findSite(s.todaySiteId) : null;
+      panel.innerHTML = '';
+      var targetSiteLabel = wizardState.siteId ? findSite(wizardState.siteId).name : '現場未定';
+      panel.appendChild(modalHeader('確認',
+        s.name + 'さんは現在「' + (site ? site.name : '現場未定') + '」に登録されています。\n「' + targetSiteLabel + '」へ移動しますか？'));
+      var body = h('div', { className: 'modal-body big-choice-list' });
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する',
+        onClick: function () { wizardState.staffIds.push(s.id); buildDobokuWizardStep2StaffMulti(panel, close, wizardState); }
+      }));
+      panel.appendChild(body);
+      panel.appendChild(h('div', { className: 'modal-footer' }, [
+        h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildDobokuWizardStep2StaffMulti(panel, close, wizardState); } })
+      ]));
+      return;
+    }
+    wizardState.staffIds.push(s.id);
+    buildDobokuWizardStep2StaffMulti(panel, close, wizardState);
+  }
+
+  function buildDobokuWizardConfirm(panel, close, wizardState) {
+    panel.innerHTML = '';
+    var site = wizardState.siteId ? findSite(wizardState.siteId) : null;
+    panel.appendChild(modalHeader('配置内容を確認してください', (site ? site.name : '現場未定') + 'へ配置します'));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+    wizardState.staffIds.forEach(function (id) {
+      var s = findStaff(id);
+      body.appendChild(h('div', { className: 'list-btn pairing-item' }, [h('span', { className: 'list-btn-text', text: s.name })]));
+    });
+    panel.appendChild(body);
+
+    panel.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: 'この内容で一括登録',
+      onClick: function () { proceedToDobokuWizardAttendanceGate(panel, close, wizardState); }
+    }));
+
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildDobokuWizardStep2StaffMulti(panel, close, wizardState); } }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
+  }
+
+  function proceedToDobokuWizardAttendanceGate(panel, close, wizardState) {
+    var absentOnes = wizardState.staffIds.map(findStaff).filter(function (s) { return s && s.attendance === 'absent'; });
+    if (!absentOnes.length) { commitDobokuWizard(wizardState, false); buildDobokuWizardAfterRegister(panel, close, wizardState); return; }
+    panel.innerHTML = '';
+    var names = absentOnes.map(function (s) { return s.name; }).join('、');
+    panel.appendChild(modalHeader('出退勤の確認', names + 'さんは現在「退勤」状態です。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '出勤を記録して配置',
+      onClick: function () { commitDobokuWizard(wizardState, true); buildDobokuWizardAfterRegister(panel, close, wizardState); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '配置だけ登録',
+      onClick: function () { commitDobokuWizard(wizardState, false); buildDobokuWizardAfterRegister(panel, close, wizardState); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  function commitDobokuWizard(wizardState, markPresent) {
+    var siteId = wizardState.siteId;
+    var now = new Date();
+    wizardState.staffIds.forEach(function (id) {
+      var s = findStaff(id);
+      s.todaySiteId = siteId;
+      if (markPresent && s.attendance !== 'present') applyAttendanceChange(s, 'present', now);
+    });
+    if (siteId) {
+      var site = findSite(siteId);
+      if (site) site.usageCount = (site.usageCount || 0) + wizardState.staffIds.length;
+    }
+    persist();
+    setLaneOpen('doboku', siteId || 'UNASSIGNED', true);
+    renderAll();
+    var siteLabel = siteId ? findSite(siteId).name : '現場未定';
+    showToast(siteLabel + 'へ', wizardState.staffIds.length + '人を配置しました');
+  }
+
+  function buildDobokuWizardAfterRegister(panel, close, wizardState) {
+    panel.innerHTML = '';
+    panel.appendChild(modalHeader('登録しました', '続けて登録しますか？'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '同じ現場に追加登録',
+      onClick: function () { wizardState.staffIds = []; buildDobokuWizardStep2StaffMulti(panel, close, wizardState); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '配車ボードへ戻る',
+      onClick: close
+    }));
+    panel.appendChild(body);
+  }
+
+  // ============================================================
   // 運輸: 配車編集メニュー(名前・ダンプ札をタップした時に表示)
   // ============================================================
   function openDispatchEditMenu(staffId) {
@@ -1282,8 +1555,470 @@
     }
   }
 
+  // 運転手なしで現場に駐車中のダンプ札をタップしたときのメニュー。
+  function openParkedVehicleMenu(vehicleId, siteId) {
+    openModal(function (panel, close) {
+      buildParkedVehicleMenuContent(panel, vehicleId, siteId, close);
+    });
+  }
+
+  function buildParkedVehicleMenuContent(panel, vehicleId, siteId, close) {
+    panel.innerHTML = '';
+    var v = findVehicle(vehicleId);
+    var site = findSite(siteId);
+    panel.appendChild(modalHeader(v.displayName, '運転手が乗っていない状態で「' + (site ? site.name : '現場未定') + '」に駐車中です'));
+
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '運転手を割り当てる',
+      onClick: function () { buildParkedVehicleAssignDriver(panel, vehicleId, siteId, close); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '現場から外す(空車に戻す)',
+      onClick: function () { v.todaySiteId = null; persist(); renderAll(); close(); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '車両状態を変更',
+      onClick: function () { buildVehicleStatusContent(panel, vehicleId, close, function () { buildParkedVehicleMenuContent(panel, vehicleId, siteId, close); }); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  function buildParkedVehicleAssignDriver(panel, vehicleId, siteId, close) {
+    panel.innerHTML = '';
+    var v = findVehicle(vehicleId);
+    panel.appendChild(modalHeader(v.displayName + 'の運転手を選択', 'タップして運転手を選んでください'));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+    var candidates = sortByOrder(state.staff.filter(function (s) { return s.department === 'unyu' && s.active !== false; }));
+    candidates.forEach(function (s) {
+      var sSite = s.todaySiteId ? findSite(s.todaySiteId) : null;
+      body.appendChild(h('button', {
+        className: 'list-btn driver-item' + (s.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
+        attrs: { type: 'button' },
+        onClick: function () { assignParkedVehicleToDriver(v, siteId, s); close(); }
+      }, [
+        h('span', { className: 'list-btn-text', text: s.name }),
+        h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
+        sSite ? h('span', { className: 'list-btn-tag', text: sSite.name }) : null
+      ]));
+    });
+    panel.appendChild(body);
+
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildParkedVehicleMenuContent(panel, vehicleId, siteId, close); } }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
+  }
+
+  function assignParkedVehicleToDriver(vehicle, siteId, driver) {
+    releaseVehicleFromOthers(vehicle.id, driver.id);
+    driver.todaySiteId = siteId;
+    driver.todayVehicleId = (driver.normalVehicleId === vehicle.id) ? null : vehicle.id;
+    vehicle.todaySiteId = null;
+    if (driver.attendance !== 'present') applyAttendanceChange(driver, 'present', new Date());
+    persist();
+    setLaneOpen('unyu', siteId, true);
+    renderAll();
+    showToast(driver.name, vehicle.displayName + 'の運転手に割り当てました');
+  }
+
   // ============================================================
-  // 配車登録ウィザード: 現場 → ダンプ → 運転手 → 確認 の4ステップ
+  // 現場グループ全体の編集メニュー(現場名札をタップした時に表示)
+  // 1人ずつではなく、複数の人・車両をまとめて追加/解除できるようにする。
+  // ============================================================
+  function openSiteGroupEditMenu(department, siteId) {
+    openModal(function (panel, close) {
+      buildSiteGroupEditMenuContent(panel, department, siteId, close);
+    });
+  }
+
+  function buildSiteGroupEditMenuContent(panel, department, siteId, close) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    var lanes = buildDepartmentLanes(department);
+    var lane = lanes.filter(function (l) { return l.kind === 'site' && l.key === siteId; })[0];
+    var memberCount = lane ? lane.members.length : 0;
+    var vehicleCount = lane ? laneVehicles(department, lane).length : 0;
+    var backHere = function () { buildSiteGroupEditMenuContent(panel, department, siteId, close); };
+
+    panel.appendChild(modalHeader(site.name + 'の編集', '変更する項目を選んでください'));
+    panel.appendChild(h('div', {
+      className: 'current-line',
+      text: memberCount + '人' + (department === 'unyu' ? ' ／ ' + vehicleCount + '台' : '')
+    }));
+
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: department === 'unyu' ? '運転手を追加' : '作業員を追加',
+      onClick: function () { buildSiteGroupAddStaff(panel, department, siteId, close, backHere); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: department === 'unyu' ? '運転手を外す' : '作業員を外す',
+      onClick: function () { buildSiteGroupRemoveStaff(panel, department, siteId, close, backHere); }
+    }));
+    if (department === 'unyu') {
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-move', attrs: { type: 'button' }, text: 'ダンプを追加',
+        onClick: function () { buildSiteGroupAddVehicle(panel, siteId, close, backHere); }
+      }));
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-move', attrs: { type: 'button' }, text: 'ダンプを外す',
+        onClick: function () { buildSiteGroupRemoveVehicle(panel, siteId, close, backHere); }
+      }));
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '運転手とダンプの組合せを変更',
+        onClick: function () { buildSiteGroupRepairPicker(panel, siteId, close, backHere); }
+      }));
+    }
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '現場名を変更',
+      onClick: function () { buildSiteGroupRenameForm(panel, siteId, close, backHere); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '現場を終了',
+      onClick: function () { buildSiteGroupEndConfirm(panel, department, siteId, close, backHere); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  function buildSiteGroupAddStaff(panel, department, siteId, close, onBack) {
+    var selected = [];
+    function render() {
+      panel.innerHTML = '';
+      var site = findSite(siteId);
+      panel.appendChild(modalHeader((department === 'unyu' ? '運転手' : '作業員') + 'を追加', site.name + 'へ追加する人をタップして選んでください(複数選択可)'));
+      panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + selected.length + '人' }));
+      var body = h('div', { className: 'modal-body scroll-list' });
+      var candidates = sortByOrder(state.staff.filter(function (s) { return s.department === department && s.active !== false && s.todaySiteId !== siteId; }));
+      candidates.forEach(function (s) {
+        var isSel = selected.indexOf(s.id) !== -1;
+        var sSite = s.todaySiteId ? findSite(s.todaySiteId) : null;
+        body.appendChild(h('button', {
+          className: 'list-btn driver-item select-item' + (isSel ? ' is-selected' : '') + (s.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
+          attrs: { type: 'button' },
+          onClick: function () {
+            var idx = selected.indexOf(s.id);
+            if (idx !== -1) { selected.splice(idx, 1); render(); return; }
+            if (isDriverAlreadyDispatched(s, siteId)) {
+              var curSite = s.todaySiteId ? findSite(s.todaySiteId) : null;
+              var targetSite = findSite(siteId);
+              panel.innerHTML = '';
+              panel.appendChild(modalHeader('確認',
+                s.name + 'さんは現在「' + (curSite ? curSite.name : '現場未定') + '」に登録されています。\n「' + targetSite.name + '」へ移動しますか？'));
+              var cbody = h('div', { className: 'modal-body big-choice-list' });
+              cbody.appendChild(h('button', { className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する', onClick: function () { selected.push(s.id); render(); } }));
+              panel.appendChild(cbody);
+              panel.appendChild(h('div', { className: 'modal-footer' }, [h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: render })]));
+              return;
+            }
+            selected.push(s.id); render();
+          }
+        }, [
+          h('span', { className: 'select-mark', text: isSel ? '■' : '□' }),
+          h('span', { className: 'list-btn-text', text: s.name }),
+          h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
+          (sSite && !isSel) ? h('span', { className: 'list-btn-tag', text: sSite.name }) : null
+        ]));
+      });
+      panel.appendChild(body);
+      panel.appendChild(h('button', {
+        className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '追加する',
+        onClick: function () { if (selected.length) commitSiteGroupAddStaff(department, siteId, selected, panel, close); }
+      }));
+      var footer = h('div', { className: 'modal-footer two-col' });
+      footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+      footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+      panel.appendChild(footer);
+    }
+    render();
+  }
+
+  function commitSiteGroupAddStaff(department, siteId, staffIds, panel, close) {
+    var absentOnes = staffIds.map(findStaff).filter(function (s) { return s.attendance === 'absent'; });
+    if (!absentOnes.length) { finalizeSiteGroupAddStaff(department, siteId, staffIds, false); close(); return; }
+    panel.innerHTML = '';
+    var names = absentOnes.map(function (s) { return s.name; }).join('、');
+    panel.appendChild(modalHeader('出退勤の確認', names + 'さんは現在「退勤」状態です。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', { className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '出勤を記録して追加', onClick: function () { finalizeSiteGroupAddStaff(department, siteId, staffIds, true); close(); } }));
+    body.appendChild(h('button', { className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '追加だけ登録', onClick: function () { finalizeSiteGroupAddStaff(department, siteId, staffIds, false); close(); } }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  function finalizeSiteGroupAddStaff(department, siteId, staffIds, markPresent) {
+    var now = new Date();
+    staffIds.forEach(function (id) {
+      var s = findStaff(id);
+      s.todaySiteId = siteId;
+      if (markPresent && s.attendance !== 'present') applyAttendanceChange(s, 'present', now);
+    });
+    var site = findSite(siteId);
+    if (site) site.usageCount = (site.usageCount || 0) + staffIds.length;
+    persist();
+    setLaneOpen(department, siteId, true);
+    renderAll();
+    showToast(site.name + 'へ', staffIds.length + '人を追加しました');
+  }
+
+  function buildSiteGroupRemoveStaff(panel, department, siteId, close, onBack) {
+    var selected = [];
+    function render() {
+      panel.innerHTML = '';
+      var site = findSite(siteId);
+      var lanes = buildDepartmentLanes(department);
+      var lane = lanes.filter(function (l) { return l.kind === 'site' && l.key === siteId; })[0];
+      var members = lane ? sortByOrder(lane.members) : [];
+      panel.appendChild(modalHeader((department === 'unyu' ? '運転手' : '作業員') + 'を外す', site.name + 'から外す人をタップして選んでください(複数選択可)'));
+      panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + selected.length + '人' }));
+      var body = h('div', { className: 'modal-body scroll-list' });
+      if (!members.length) body.appendChild(h('p', { className: 'record-empty', text: 'この現場には誰もいません。' }));
+      members.forEach(function (s) {
+        var isSel = selected.indexOf(s.id) !== -1;
+        body.appendChild(h('button', {
+          className: 'list-btn driver-item select-item' + (isSel ? ' is-selected' : ''),
+          attrs: { type: 'button' },
+          onClick: function () {
+            var idx = selected.indexOf(s.id);
+            if (idx !== -1) selected.splice(idx, 1); else selected.push(s.id);
+            render();
+          }
+        }, [
+          h('span', { className: 'select-mark', text: isSel ? '■' : '□' }),
+          h('span', { className: 'list-btn-text', text: s.name })
+        ]));
+      });
+      panel.appendChild(body);
+      panel.appendChild(h('button', {
+        className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '外す',
+        onClick: function () {
+          if (!selected.length) return;
+          selected.forEach(function (id) { var s = findStaff(id); s.todaySiteId = null; s.todayVehicleId = 'UNASSIGNED'; });
+          persist(); renderAll();
+          showToast(site.name, selected.length + '人を外しました');
+          close();
+        }
+      }));
+      var footer = h('div', { className: 'modal-footer two-col' });
+      footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+      footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+      panel.appendChild(footer);
+    }
+    render();
+  }
+
+  function buildSiteGroupAddVehicle(panel, siteId, close, onBack) {
+    var selected = [];
+    function vehicleCurrentSiteId(v) {
+      var d = findDriverUsingVehicle(v.id, null);
+      return d ? d.todaySiteId : v.todaySiteId;
+    }
+    function render() {
+      panel.innerHTML = '';
+      var site = findSite(siteId);
+      panel.appendChild(modalHeader('ダンプを追加', site.name + 'へ追加するダンプをタップして選んでください(複数選択可)'));
+      panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + selected.length + '台' }));
+      var body = h('div', { className: 'modal-body scroll-list' });
+      var vehicles = sortByOrder(state.vehicles.filter(function (v) { return v.active !== false; }));
+      vehicles.forEach(function (v) {
+        var usable = v.status === 'available';
+        var curSiteId = vehicleCurrentSiteId(v);
+        if (curSiteId === siteId) return;
+        var isSel = selected.indexOf(v.id) !== -1;
+        var lines = [h('span', { className: 'select-mark', text: isSel ? '■' : '□' }), h('span', { className: 'list-btn-text', text: v.displayName })];
+        if (!usable) lines.push(h('span', { className: 'status-badge status-' + v.status, text: VEHICLE_STATUS_LABELS[v.status] }));
+        if (usable && curSiteId) { var cs = findSite(curSiteId); lines.push(h('span', { className: 'list-btn-tag', text: (cs ? cs.name : '現場未定') + 'で使用中' })); }
+        body.appendChild(h('button', {
+          className: 'list-btn vehicle-item select-item' + (isSel ? ' is-selected' : '') + (usable ? '' : ' is-disabled'),
+          attrs: { type: 'button' }, disabled: !usable,
+          onClick: function () {
+            if (!usable) return;
+            var idx = selected.indexOf(v.id);
+            if (idx !== -1) { selected.splice(idx, 1); render(); return; }
+            if (curSiteId) {
+              var cs2 = findSite(curSiteId);
+              panel.innerHTML = '';
+              panel.appendChild(modalHeader('確認', v.displayName + 'は現在「' + (cs2 ? cs2.name : '現場未定') + '」で使用中です。\n「' + site.name + '」へ移動しますか？'));
+              var cbody = h('div', { className: 'modal-body big-choice-list' });
+              cbody.appendChild(h('button', { className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する', onClick: function () { selected.push(v.id); render(); } }));
+              panel.appendChild(cbody);
+              panel.appendChild(h('div', { className: 'modal-footer' }, [h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: render })]));
+              return;
+            }
+            selected.push(v.id); render();
+          }
+        }, lines));
+      });
+      panel.appendChild(body);
+      panel.appendChild(h('button', {
+        className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '追加する',
+        onClick: function () {
+          if (!selected.length) return;
+          selected.forEach(function (vid) { releaseVehicleFromOthers(vid, null); var v = findVehicle(vid); v.todaySiteId = siteId; });
+          persist(); renderAll();
+          showToast(site.name + 'へ', selected.length + '台を追加しました');
+          close();
+        }
+      }));
+      var footer = h('div', { className: 'modal-footer two-col' });
+      footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+      footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+      panel.appendChild(footer);
+    }
+    render();
+  }
+
+  function buildSiteGroupRemoveVehicle(panel, siteId, close, onBack) {
+    var selected = [];
+    function render() {
+      panel.innerHTML = '';
+      var site = findSite(siteId);
+      var lanes = buildDepartmentLanes('unyu');
+      var lane = lanes.filter(function (l) { return l.kind === 'site' && l.key === siteId; })[0];
+      var vehicles = lane ? laneVehicles('unyu', lane) : [];
+      panel.appendChild(modalHeader('ダンプを外す', site.name + 'から外すダンプをタップして選んでください(複数選択可)'));
+      panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + selected.length + '台' }));
+      var body = h('div', { className: 'modal-body scroll-list' });
+      if (!vehicles.length) body.appendChild(h('p', { className: 'record-empty', text: 'この現場にダンプはありません。' }));
+      vehicles.forEach(function (v) {
+        var isSel = selected.indexOf(v.id) !== -1;
+        body.appendChild(h('button', {
+          className: 'list-btn vehicle-item select-item' + (isSel ? ' is-selected' : ''),
+          attrs: { type: 'button' },
+          onClick: function () {
+            var idx = selected.indexOf(v.id);
+            if (idx !== -1) selected.splice(idx, 1); else selected.push(v.id);
+            render();
+          }
+        }, [
+          h('span', { className: 'select-mark', text: isSel ? '■' : '□' }),
+          h('span', { className: 'list-btn-text', text: v.displayName })
+        ]));
+      });
+      panel.appendChild(body);
+      panel.appendChild(h('button', {
+        className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '外す',
+        onClick: function () {
+          if (!selected.length) return;
+          selected.forEach(function (vid) {
+            var driver = findDriverUsingVehicle(vid, null);
+            if (driver) driver.todayVehicleId = 'UNASSIGNED';
+            var v = findVehicle(vid); if (v) v.todaySiteId = null;
+          });
+          persist(); renderAll();
+          showToast(site.name, selected.length + '台を外しました');
+          close();
+        }
+      }));
+      var footer = h('div', { className: 'modal-footer two-col' });
+      footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+      footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+      panel.appendChild(footer);
+    }
+    render();
+  }
+
+  function buildSiteGroupRepairPicker(panel, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var lanes = buildDepartmentLanes('unyu');
+    var lane = lanes.filter(function (l) { return l.kind === 'site' && l.key === siteId; })[0];
+    var members = lane ? sortByOrder(lane.members) : [];
+    panel.appendChild(modalHeader('組合せを変更', 'ダンプを変更する運転手をタップしてください'));
+    var body = h('div', { className: 'modal-body scroll-list' });
+    if (!members.length) body.appendChild(h('p', { className: 'record-empty', text: 'この現場に運転手はいません。' }));
+    members.forEach(function (s) {
+      var vehId = effectiveVehicleId(s);
+      var vehicle = vehId ? findVehicle(vehId) : null;
+      body.appendChild(h('button', {
+        className: 'list-btn driver-item', attrs: { type: 'button' },
+        onClick: function () { buildVehicleSelectContent(panel, s.id, close, function () { buildSiteGroupRepairPicker(panel, siteId, close, onBack); }); }
+      }, [
+        h('span', { className: 'list-btn-text', text: s.name }),
+        h('span', { className: 'list-btn-tag', text: vehicle ? vehicle.displayName : '未割当' })
+      ]));
+    });
+    panel.appendChild(body);
+    panel.appendChild(h('div', { className: 'modal-footer' }, [
+      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack })
+    ]));
+  }
+
+  function buildSiteGroupRenameForm(panel, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    panel.appendChild(modalHeader('現場名を変更', '新しい現場名を入力してください'));
+    var body = h('div', { className: 'modal-body' });
+    var errorMsg = h('p', { className: 'form-error hidden' });
+    var input = h('input', { className: 'form-input', attrs: { type: 'text', inputmode: 'text', autocomplete: 'off' } });
+    input.value = site.name;
+    body.appendChild(h('label', { className: 'form-label', text: '現場名' }));
+    body.appendChild(input);
+    body.appendChild(errorMsg);
+    panel.appendChild(body);
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+    footer.appendChild(h('button', {
+      className: 'save-btn', text: '保存', attrs: { type: 'button' },
+      onClick: function () {
+        var result = renameSite(siteId, input.value);
+        if (!result.ok) {
+          errorMsg.textContent = result.reason === 'duplicate' ? '同じ名前の現場が既に登録されています。' : '現場名を入力してください。';
+          errorMsg.classList.remove('hidden');
+          return;
+        }
+        close();
+      }
+    }));
+    panel.appendChild(footer);
+    input.focus();
+  }
+
+  function buildSiteGroupEndConfirm(panel, department, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    panel.appendChild(modalHeader('現場を終了しますか？', site.name + 'に配置されている全員・全車両の割当を解除します(現場自体は削除されず、翌日以降も選び直せます)。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', { className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '終了する', onClick: function () { endSiteToday(siteId); close(); } }));
+    panel.appendChild(body);
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
+  }
+
+  // 運輸見出しの「既存現場を編集」から: 現場を選んでから編集メニューを開く。
+  function openExistingSiteEditPicker(department) {
+    openModal(function (panel, close) {
+      buildExistingSiteEditPicker(panel, department, close);
+    });
+  }
+
+  function buildExistingSiteEditPicker(panel, department, close) {
+    panel.innerHTML = '';
+    panel.appendChild(modalHeader('編集する現場を選択', '現場をタップしてください'));
+    var body = h('div', { className: 'modal-body scroll-list' });
+    var lanes = buildDepartmentLanes(department).filter(function (l) { return l.kind === 'site'; });
+    if (!lanes.length) body.appendChild(h('p', { className: 'record-empty', text: '現在、現場に配置されている人はいません。' }));
+    lanes.forEach(function (lane) {
+      body.appendChild(h('button', {
+        className: 'list-btn site-item', attrs: { type: 'button' },
+        onClick: function () { close(); openSiteGroupEditMenu(department, lane.key); }
+      }, [
+        h('span', { className: 'list-btn-text', text: lane.label }),
+        h('span', { className: 'list-btn-tag', text: lane.members.length + '人' })
+      ]));
+    });
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  // ============================================================
+  // 配車登録ウィザード: 現場 → ダンプ(複数選択) → 運転手(複数選択) →
+  // 対応確認 → 一括登録 の5画面。1件ずつ繰り返す必要がないよう、
+  // ダンプ・運転手はどちらも複数タップで選び、最後にまとめて登録する。
   // ============================================================
   var WIZARD_STEP_LABELS = ['現場', 'ダンプ', '運転手', '確認'];
 
@@ -1298,10 +2033,14 @@
     }));
   }
 
+  function newUnyuWizardState() {
+    return { siteId: null, vehicleIds: [], driverIds: [], pairs: [], extraDriverIds: [], extraVehicleIds: [] };
+  }
+
   // 新規配車登録の開始(現場・ダンプ・運転手すべて未選択の状態から)
   function openDispatchWizard() {
     openModal(function (panel, close) {
-      buildWizardStep1Site(panel, close, { siteId: null, vehicleId: null, personId: null });
+      buildWizardStep1Site(panel, close, newUnyuWizardState());
     });
   }
 
@@ -1327,7 +2066,7 @@
     relevantUnyuSites().forEach(function (site) {
       body.appendChild(h('button', {
         className: 'list-btn site-item', attrs: { type: 'button' },
-        onClick: function () { wizardState.siteId = site.id; buildWizardStep2Vehicle(panel, close, wizardState); }
+        onClick: function () { wizardState.siteId = site.id; buildWizardStep2VehicleMulti(panel, close, wizardState); }
       }, [
         h('span', { className: 'list-btn-text', text: site.name }),
         h('span', { className: 'list-btn-tag', text: '現在' + countVehiclesAtSite(site.id) + '台' })
@@ -1335,7 +2074,7 @@
     });
     body.appendChild(h('button', {
       className: 'list-btn site-item', attrs: { type: 'button' },
-      onClick: function () { wizardState.siteId = null; buildWizardStep2Vehicle(panel, close, wizardState); }
+      onClick: function () { wizardState.siteId = null; buildWizardStep2VehicleMulti(panel, close, wizardState); }
     }, [h('span', { className: 'list-btn-text', text: '現場未定' })]));
     panel.appendChild(body);
 
@@ -1343,49 +2082,55 @@
       className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '＋ 新規現場を追加',
       onClick: function () {
         buildNewSiteFormCore(panel,
-          function (site) { wizardState.siteId = site.id; buildWizardStep2Vehicle(panel, close, wizardState); },
+          function (site) { wizardState.siteId = site.id; buildWizardStep2VehicleMulti(panel, close, wizardState); },
           function () { buildWizardStep1Site(panel, close, wizardState); });
       }
     }));
     panel.appendChild(cancelBar(close));
   }
 
-  // ---- ステップ2: ダンプ ----
-  function buildWizardStep2Vehicle(panel, close, wizardState) {
+  // ---- ステップ2: ダンプ(複数選択) ----
+  function buildWizardStep2VehicleMulti(panel, close, wizardState) {
     panel.innerHTML = '';
     panel.appendChild(wizardProgress(2));
     var siteLabel = wizardState.siteId ? findSite(wizardState.siteId).name : '現場未定';
-    panel.appendChild(modalHeader('ダンプを選択', siteLabel + 'へ配車するダンプをタップしてください'));
+    panel.appendChild(modalHeader('ダンプを選択', siteLabel + 'へ配車するダンプをタップして選んでください(複数選択可)'));
+    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + wizardState.vehicleIds.length + '台' }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
     var vehicles = sortByOrder(state.vehicles.filter(function (v) { return v.active !== false; }));
     vehicles.forEach(function (v) {
       var usable = v.status === 'available';
+      var selected = wizardState.vehicleIds.indexOf(v.id) !== -1;
       var holder = usable ? findDriverUsingVehicle(v.id, null) : null;
       var normalDriver = state.staff.find(function (s) { return s.department === 'unyu' && s.active !== false && s.normalVehicleId === v.id; });
-      var lines = [h('span', { className: 'list-btn-text', text: v.displayName })];
+      var lines = [
+        h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
+        h('span', { className: 'list-btn-text', text: v.displayName })
+      ];
       if (!usable) lines.push(h('span', { className: 'status-badge status-' + v.status, text: VEHICLE_STATUS_LABELS[v.status] }));
-      if (usable && holder) {
+      if (usable && !selected && holder) {
         var holderSite = holder.todaySiteId ? findSite(holder.todaySiteId) : null;
         lines.push(h('span', { className: 'list-btn-tag', text: holder.name + 'さん使用中(' + (holderSite ? holderSite.name : '現場未定') + ')' }));
       }
+      if (usable && !selected && !holder && v.todaySiteId) {
+        var parkedSite = findSite(v.todaySiteId);
+        lines.push(h('span', { className: 'list-btn-tag', text: (parkedSite ? parkedSite.name : '') + 'に駐車中' }));
+      }
       if (usable && normalDriver) lines.push(h('span', { className: 'list-btn-tag', text: '通常運転手:' + normalDriver.name }));
       body.appendChild(h('button', {
-        className: 'list-btn vehicle-item' + (usable ? '' : ' is-disabled'),
+        className: 'list-btn vehicle-item select-item' + (selected ? ' is-selected' : '') + (usable ? '' : ' is-disabled'),
         attrs: { type: 'button' },
         disabled: !usable,
-        onClick: function () {
-          if (!usable) return;
-          if (holder) {
-            buildWizardVehicleMoveConfirm(panel, close, wizardState, v, holder);
-          } else {
-            wizardState.vehicleId = v.id;
-            buildWizardStep3Driver(panel, close, wizardState);
-          }
-        }
+        onClick: function () { if (usable) toggleWizardVehicle(panel, close, wizardState, v); }
       }, lines));
     });
     panel.appendChild(body);
+
+    var actionRow = h('div', { className: 'modal-footer two-col' });
+    actionRow.appendChild(h('button', { className: 'cancel-btn', text: '全選択解除', attrs: { type: 'button' }, onClick: function () { wizardState.vehicleIds = []; buildWizardStep2VehicleMulti(panel, close, wizardState); } }));
+    actionRow.appendChild(h('button', { className: 'save-btn', text: '次へ', attrs: { type: 'button' }, onClick: function () { buildWizardStep3DriverMulti(panel, close, wizardState); } }));
+    panel.appendChild(actionRow);
 
     var footer = h('div', { className: 'modal-footer two-col' });
     footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep1Site(panel, close, wizardState); } }));
@@ -1393,54 +2138,66 @@
     panel.appendChild(footer);
   }
 
-  function buildWizardVehicleMoveConfirm(panel, close, wizardState, vehicle, holder) {
+  function toggleWizardVehicle(panel, close, wizardState, v) {
+    var idx = wizardState.vehicleIds.indexOf(v.id);
+    if (idx !== -1) { wizardState.vehicleIds.splice(idx, 1); buildWizardStep2VehicleMulti(panel, close, wizardState); return; }
+    var holder = findDriverUsingVehicle(v.id, null);
+    if (holder && holder.todaySiteId !== wizardState.siteId) {
+      var holderSite = holder.todaySiteId ? findSite(holder.todaySiteId) : null;
+      buildWizardVehicleMoveConfirm(panel, close, wizardState, v,
+        v.displayName + 'は現在「' + (holderSite ? holderSite.name : '現場未定') + '」の' + holder.name + 'さんが使用しています。');
+      return;
+    }
+    if (!holder && v.todaySiteId && v.todaySiteId !== wizardState.siteId) {
+      var parkedSite = findSite(v.todaySiteId);
+      buildWizardVehicleMoveConfirm(panel, close, wizardState, v,
+        v.displayName + 'は現在「' + (parkedSite ? parkedSite.name : '') + '」に駐車中です。');
+      return;
+    }
+    wizardState.vehicleIds.push(v.id);
+    buildWizardStep2VehicleMulti(panel, close, wizardState);
+  }
+
+  function buildWizardVehicleMoveConfirm(panel, close, wizardState, vehicle, message) {
     panel.innerHTML = '';
-    var holderSite = holder.todaySiteId ? findSite(holder.todaySiteId) : null;
     var targetSiteLabel = wizardState.siteId ? findSite(wizardState.siteId).name : '現場未定';
-    panel.appendChild(modalHeader('確認',
-      vehicle.displayName + 'は現在「' + (holderSite ? holderSite.name : '現場未定') + '」に登録されています。\n' +
-      '「' + targetSiteLabel + '」へ移動しますか？'));
+    panel.appendChild(modalHeader('確認', message + '\n「' + targetSiteLabel + '」へ移動しますか？'));
     var body = h('div', { className: 'modal-body big-choice-list' });
     body.appendChild(h('button', {
       className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する',
-      onClick: function () { wizardState.vehicleId = vehicle.id; buildWizardStep3Driver(panel, close, wizardState); }
+      onClick: function () { wizardState.vehicleIds.push(vehicle.id); buildWizardStep2VehicleMulti(panel, close, wizardState); }
     }));
     panel.appendChild(body);
     panel.appendChild(h('div', { className: 'modal-footer' }, [
-      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep2Vehicle(panel, close, wizardState); } })
+      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep2VehicleMulti(panel, close, wizardState); } })
     ]));
   }
 
-  // ---- ステップ3: 運転手 ----
-  function buildWizardStep3Driver(panel, close, wizardState) {
+  // ---- ステップ3: 運転手(複数選択) ----
+  function buildWizardStep3DriverMulti(panel, close, wizardState) {
     panel.innerHTML = '';
     panel.appendChild(wizardProgress(3));
-    var vehicle = findVehicle(wizardState.vehicleId);
-    panel.appendChild(modalHeader('運転手を選択', vehicle.displayName + 'を運転する人をタップしてください'));
+    panel.appendChild(modalHeader('運転手を選択', 'タップして運転手を選んでください(複数選択可)'));
+    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + wizardState.driverIds.length + '人 ／ 選択ダンプ：' + wizardState.vehicleIds.length + '台' }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
     var allDrivers = sortByOrder(state.staff.filter(function (s) { return s.department === 'unyu' && s.active !== false; }));
-    var recommended = allDrivers.filter(function (s) { return s.normalVehicleId === vehicle.id; });
-    var others = allDrivers.filter(function (s) { return s.normalVehicleId !== vehicle.id; });
+    var recommended = allDrivers.filter(function (s) { return s.normalVehicleId && wizardState.vehicleIds.indexOf(s.normalVehicleId) !== -1; });
+    var others = allDrivers.filter(function (s) { return recommended.indexOf(s) === -1; });
 
     function driverButton(s, tagText) {
+      var selected = wizardState.driverIds.indexOf(s.id) !== -1;
       var dSite = s.todaySiteId ? findSite(s.todaySiteId) : null;
       return h('button', {
-        className: 'list-btn driver-item' + (s.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
+        className: 'list-btn driver-item select-item' + (selected ? ' is-selected' : '') + (s.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
         attrs: { type: 'button' },
-        onClick: function () {
-          if (isDriverAlreadyDispatched(s, wizardState.siteId)) {
-            buildWizardDriverMoveConfirm(panel, close, wizardState, s);
-          } else {
-            wizardState.personId = s.id;
-            buildWizardStep4Confirm(panel, close, wizardState);
-          }
-        }
+        onClick: function () { toggleWizardDriver(panel, close, wizardState, s); }
       }, [
+        h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
         h('span', { className: 'list-btn-text', text: s.name }),
         h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
         tagText ? h('span', { className: 'list-btn-tag', text: tagText }) : null,
-        dSite ? h('span', { className: 'list-btn-tag', text: dSite.name }) : null
+        (dSite && !selected) ? h('span', { className: 'list-btn-tag', text: dSite.name }) : null
       ]);
     }
 
@@ -1452,72 +2209,241 @@
     others.forEach(function (s) { body.appendChild(driverButton(s, null)); });
     panel.appendChild(body);
 
+    var actionRow = h('div', { className: 'modal-footer two-col' });
+    actionRow.appendChild(h('button', { className: 'cancel-btn', text: '全選択解除', attrs: { type: 'button' }, onClick: function () { wizardState.driverIds = []; buildWizardStep3DriverMulti(panel, close, wizardState); } }));
+    actionRow.appendChild(h('button', { className: 'save-btn', text: '次へ', attrs: { type: 'button' }, onClick: function () { afterWizardDriverStep(panel, close, wizardState); } }));
+    panel.appendChild(actionRow);
+
     var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep2Vehicle(panel, close, wizardState); } }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep2VehicleMulti(panel, close, wizardState); } }));
     footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
     panel.appendChild(footer);
   }
 
-  function buildWizardDriverMoveConfirm(panel, close, wizardState, driver) {
+  function toggleWizardDriver(panel, close, wizardState, s) {
+    var idx = wizardState.driverIds.indexOf(s.id);
+    if (idx !== -1) { wizardState.driverIds.splice(idx, 1); buildWizardStep3DriverMulti(panel, close, wizardState); return; }
+    if (isDriverAlreadyDispatched(s, wizardState.siteId)) {
+      var site = s.todaySiteId ? findSite(s.todaySiteId) : null;
+      buildWizardDriverMoveConfirm(panel, close, wizardState, s,
+        s.name + 'さんは現在「' + (site ? site.name : '現場未定') + '」に登録されています。');
+      return;
+    }
+    wizardState.driverIds.push(s.id);
+    buildWizardStep3DriverMulti(panel, close, wizardState);
+  }
+
+  function buildWizardDriverMoveConfirm(panel, close, wizardState, driver, message) {
     panel.innerHTML = '';
-    var driverSite = driver.todaySiteId ? findSite(driver.todaySiteId) : null;
     var targetSiteLabel = wizardState.siteId ? findSite(wizardState.siteId).name : '現場未定';
-    panel.appendChild(modalHeader('確認',
-      driver.name + 'さんは現在「' + (driverSite ? driverSite.name : '現場未定') + '」に登録されています。\n' +
-      '「' + targetSiteLabel + '」へ移動しますか？'));
+    panel.appendChild(modalHeader('確認', message + '\n「' + targetSiteLabel + '」へ移動しますか？'));
     var body = h('div', { className: 'modal-body big-choice-list' });
     body.appendChild(h('button', {
       className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する',
-      onClick: function () { wizardState.personId = driver.id; buildWizardStep4Confirm(panel, close, wizardState); }
+      onClick: function () { wizardState.driverIds.push(driver.id); buildWizardStep3DriverMulti(panel, close, wizardState); }
     }));
     panel.appendChild(body);
     panel.appendChild(h('div', { className: 'modal-footer' }, [
-      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep3Driver(panel, close, wizardState); } })
+      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep3DriverMulti(panel, close, wizardState); } })
     ]));
   }
 
-  // ---- ステップ4: 確認・登録 ----
-  function buildWizardStep4Confirm(panel, close, wizardState) {
+  // 運転手・ダンプの人数と台数が一致しない場合は、対応確認の前に警告する。
+  function afterWizardDriverStep(panel, close, wizardState) {
+    var dCount = wizardState.driverIds.length, vCount = wizardState.vehicleIds.length;
+    if (dCount === 0 && vCount === 0) return;
+    if (dCount !== vCount && dCount > 0 && vCount > 0) {
+      buildWizardMismatchWarning(panel, close, wizardState);
+    } else {
+      computeWizardPairs(wizardState);
+      buildWizardPairingConfirm(panel, close, wizardState);
+    }
+  }
+
+  function buildWizardMismatchWarning(panel, close, wizardState) {
+    panel.innerHTML = '';
+    panel.appendChild(modalHeader('確認', '運転手は' + wizardState.driverIds.length + '人、ダンプは' + wizardState.vehicleIds.length + '台選択されています。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '選択を修正',
+      onClick: function () { buildWizardStep3DriverMulti(panel, close, wizardState); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '未割当を含めて登録',
+      onClick: function () { computeWizardPairs(wizardState); buildWizardPairingConfirm(panel, close, wizardState); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  // 選択されたダンプ・運転手から仮の対応関係を作る。通常ダンプの組合せを
+  // 優先し、残りは選択順にペアリングする。あぶれた分は「未割当」として残す。
+  function computeWizardPairs(wizardState) {
+    var pairs = [];
+    var usedVehicle = {}, usedDriver = {};
+    wizardState.driverIds.forEach(function (did) {
+      var s = findStaff(did);
+      if (s.normalVehicleId && wizardState.vehicleIds.indexOf(s.normalVehicleId) !== -1 && !usedVehicle[s.normalVehicleId]) {
+        pairs.push({ staffId: did, vehicleId: s.normalVehicleId });
+        usedVehicle[s.normalVehicleId] = true;
+        usedDriver[did] = true;
+      }
+    });
+    var remDrivers = wizardState.driverIds.filter(function (id) { return !usedDriver[id]; });
+    var remVehicles = wizardState.vehicleIds.filter(function (id) { return !usedVehicle[id]; });
+    var n = Math.min(remDrivers.length, remVehicles.length);
+    for (var i = 0; i < n; i++) {
+      pairs.push({ staffId: remDrivers[i], vehicleId: remVehicles[i] });
+    }
+    wizardState.pairs = pairs;
+    wizardState.extraDriverIds = remDrivers.slice(n);
+    wizardState.extraVehicleIds = remVehicles.slice(n);
+  }
+
+  // ---- ステップ4: 対応関係の確認・一括登録 ----
+  function buildWizardPairingConfirm(panel, close, wizardState) {
     panel.innerHTML = '';
     panel.appendChild(wizardProgress(4));
     var site = wizardState.siteId ? findSite(wizardState.siteId) : null;
-    var vehicle = findVehicle(wizardState.vehicleId);
-    var driver = findStaff(wizardState.personId);
-    panel.appendChild(modalHeader('配車内容を確認してください', ''));
+    panel.appendChild(modalHeader('対応関係を確認してください', (site ? site.name : '現場未定') + 'の配車内容です。行をタップすると、その人のダンプを変更できます。'));
 
-    var body = h('div', { className: 'modal-body' });
-    body.appendChild(h('div', { className: 'confirm-row' }, [h('span', { className: 'confirm-label', text: '現場' }), h('span', { className: 'confirm-value', text: site ? site.name : '現場未定' })]));
-    body.appendChild(h('div', { className: 'confirm-row' }, [h('span', { className: 'confirm-label', text: 'ダンプ' }), h('span', { className: 'confirm-value', text: vehicle.displayName })]));
-    body.appendChild(h('div', { className: 'confirm-row' }, [h('span', { className: 'confirm-label', text: '運転手' }), h('span', { className: 'confirm-value', text: driver.name })]));
+    var body = h('div', { className: 'modal-body scroll-list' });
+    wizardState.pairs.forEach(function (p, idx) {
+      var driver = findStaff(p.staffId);
+      var vehicle = findVehicle(p.vehicleId);
+      body.appendChild(h('button', {
+        className: 'list-btn pairing-item', attrs: { type: 'button' },
+        onClick: function () { buildWizardPairVehiclePicker(panel, close, wizardState, idx); }
+      }, [
+        h('span', { className: 'list-btn-text', text: driver.name }),
+        h('span', { className: 'list-btn-tag', text: '→ ' + vehicle.displayName })
+      ]));
+    });
+    wizardState.extraDriverIds.forEach(function (did) {
+      var driver = findStaff(did);
+      body.appendChild(h('div', { className: 'list-btn pairing-item is-unpaired' }, [
+        h('span', { className: 'list-btn-text', text: driver.name }),
+        h('span', { className: 'list-btn-tag', text: '未割当(ダンプなし)' })
+      ]));
+    });
+    wizardState.extraVehicleIds.forEach(function (vid) {
+      var vehicle = findVehicle(vid);
+      body.appendChild(h('div', { className: 'list-btn pairing-item is-unpaired' }, [
+        h('span', { className: 'list-btn-text', text: vehicle.displayName }),
+        h('span', { className: 'list-btn-tag', text: '未割当(運転手なし)' })
+      ]));
+    });
     panel.appendChild(body);
 
     panel.appendChild(h('button', {
-      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: 'この内容で登録',
-      onClick: function () { commitDispatch(wizardState); buildWizardAfterRegister(panel, close, wizardState); }
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: 'この内容で一括登録',
+      onClick: function () { proceedToWizardAttendanceGate(panel, close, wizardState); }
     }));
 
     var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep3Driver(panel, close, wizardState); } }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStep3DriverMulti(panel, close, wizardState); } }));
     footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
     panel.appendChild(footer);
   }
 
-  function commitDispatch(wizardState) {
-    var driver = findStaff(wizardState.personId);
-    var vehicle = findVehicle(wizardState.vehicleId);
+  function buildWizardPairVehiclePicker(panel, close, wizardState, pairIndex) {
+    panel.innerHTML = '';
+    var driver = findStaff(wizardState.pairs[pairIndex].staffId);
+    panel.appendChild(modalHeader(driver.name + 'さんのダンプを変更', '選択中のダンプから選んでください'));
 
-    releaseVehicleFromOthers(vehicle.id, driver.id);
-    driver.todaySiteId = wizardState.siteId;
-    driver.todayVehicleId = (driver.normalVehicleId === vehicle.id) ? null : vehicle.id;
-    if (driver.attendance !== 'present') applyAttendanceChange(driver, 'present', new Date());
-    if (wizardState.siteId) {
-      var site = findSite(wizardState.siteId);
-      if (site) site.usageCount = (site.usageCount || 0) + 1;
+    var body = h('div', { className: 'modal-body scroll-list' });
+    wizardState.vehicleIds.forEach(function (vid) {
+      var vehicle = findVehicle(vid);
+      var owner = wizardState.pairs.filter(function (p, i) { return i !== pairIndex && p.vehicleId === vid; })[0];
+      var selected = wizardState.pairs[pairIndex].vehicleId === vid;
+      body.appendChild(h('button', {
+        className: 'list-btn vehicle-item' + (selected ? ' is-selected' : ''), attrs: { type: 'button' },
+        onClick: function () { reassignWizardPairVehicle(wizardState, pairIndex, vid); buildWizardPairingConfirm(panel, close, wizardState); }
+      }, [
+        h('span', { className: 'list-btn-text', text: vehicle.displayName }),
+        owner ? h('span', { className: 'list-btn-tag', text: findStaff(owner.staffId).name + 'さんと交換' }) : null,
+        selected ? h('span', { className: 'current-badge', text: '選択中' }) : null
+      ]));
+    });
+    panel.appendChild(body);
+    panel.appendChild(h('div', { className: 'modal-footer' }, [
+      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardPairingConfirm(panel, close, wizardState); } })
+    ]));
+  }
+
+  function reassignWizardPairVehicle(wizardState, pairIndex, newVehicleId) {
+    var pairs = wizardState.pairs;
+    var oldVehicleId = pairs[pairIndex].vehicleId;
+    if (newVehicleId === oldVehicleId) return;
+    var otherIdx = -1;
+    pairs.forEach(function (p, i) { if (i !== pairIndex && p.vehicleId === newVehicleId) otherIdx = i; });
+    if (otherIdx !== -1) {
+      pairs[otherIdx].vehicleId = oldVehicleId;
+    } else {
+      var exIdx = wizardState.extraVehicleIds.indexOf(newVehicleId);
+      if (exIdx !== -1) wizardState.extraVehicleIds.splice(exIdx, 1);
+      if (oldVehicleId) wizardState.extraVehicleIds.push(oldVehicleId);
+    }
+    pairs[pairIndex].vehicleId = newVehicleId;
+  }
+
+  // 退勤中の人が含まれる場合は、出勤打刻をどうするか確認してから登録する
+  // (配車登録だけで出勤打刻を自動追加しない)。
+  function proceedToWizardAttendanceGate(panel, close, wizardState) {
+    var allDriverIds = wizardState.driverIds;
+    var absentOnes = allDriverIds.map(findStaff).filter(function (s) { return s && s.attendance === 'absent'; });
+    if (!absentOnes.length) { commitWizardDispatch(wizardState, false); buildWizardAfterRegister(panel, close, wizardState); return; }
+    buildWizardAttendanceGate(panel, close, wizardState, absentOnes);
+  }
+
+  function buildWizardAttendanceGate(panel, close, wizardState, absentOnes) {
+    panel.innerHTML = '';
+    var names = absentOnes.map(function (s) { return s.name; }).join('、');
+    panel.appendChild(modalHeader('出退勤の確認', names + 'さんは現在「退勤」状態です。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '出勤を記録して配車',
+      onClick: function () { commitWizardDispatch(wizardState, true); buildWizardAfterRegister(panel, close, wizardState); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '配車だけ登録',
+      onClick: function () { commitWizardDispatch(wizardState, false); buildWizardAfterRegister(panel, close, wizardState); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
+  }
+
+  function commitWizardDispatch(wizardState, markPresent) {
+    var siteId = wizardState.siteId;
+    var now = new Date();
+    wizardState.pairs.forEach(function (p) {
+      var driver = findStaff(p.staffId);
+      var vehicle = findVehicle(p.vehicleId);
+      releaseVehicleFromOthers(vehicle.id, driver.id);
+      driver.todaySiteId = siteId;
+      driver.todayVehicleId = (driver.normalVehicleId === vehicle.id) ? null : vehicle.id;
+      vehicle.todaySiteId = null;
+      if (markPresent && driver.attendance !== 'present') applyAttendanceChange(driver, 'present', now);
+    });
+    wizardState.extraDriverIds.forEach(function (did) {
+      var driver = findStaff(did);
+      driver.todaySiteId = siteId;
+      driver.todayVehicleId = 'UNASSIGNED';
+      if (markPresent && driver.attendance !== 'present') applyAttendanceChange(driver, 'present', now);
+    });
+    if (siteId) {
+      wizardState.extraVehicleIds.forEach(function (vid) {
+        var vehicle = findVehicle(vid);
+        if (vehicle) vehicle.todaySiteId = siteId;
+      });
+      var site = findSite(siteId);
+      if (site) site.usageCount = (site.usageCount || 0) + wizardState.driverIds.length;
     }
     persist();
-    setLaneOpen('unyu', wizardState.siteId || 'UNASSIGNED', true);
+    setLaneOpen('unyu', siteId || 'UNASSIGNED', true);
     renderAll();
-    showToast((wizardState.siteId ? findSite(wizardState.siteId).name : '現場未定') + 'へ', driver.name + '・' + vehicle.displayName + 'を登録しました');
+    var siteLabel = siteId ? findSite(siteId).name : '現場未定';
+    showToast(siteLabel + 'へ', wizardState.driverIds.length + '人・' + wizardState.vehicleIds.length + '台を登録しました');
   }
 
   function buildWizardAfterRegister(panel, close, wizardState) {
@@ -1525,11 +2451,14 @@
     panel.appendChild(modalHeader('登録しました', '続けて登録しますか？'));
     var body = h('div', { className: 'modal-body big-choice-list' });
     body.appendChild(h('button', {
-      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '同じ現場にもう1台追加',
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '同じ現場に追加登録',
       onClick: function () {
-        wizardState.vehicleId = null;
-        wizardState.personId = null;
-        buildWizardStep2Vehicle(panel, close, wizardState);
+        wizardState.vehicleIds = [];
+        wizardState.driverIds = [];
+        wizardState.pairs = [];
+        wizardState.extraDriverIds = [];
+        wizardState.extraVehicleIds = [];
+        buildWizardStep2VehicleMulti(panel, close, wizardState);
       }
     }));
     body.appendChild(h('button', {
