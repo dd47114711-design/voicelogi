@@ -73,6 +73,7 @@ button:disabled { cursor: default; }
 /* ---------------- 全体レイアウト ---------------- */
 #board {
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -82,9 +83,10 @@ button:disabled { cursor: default; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 .dept-doboku { flex: 0 1 38%; min-height: 210px; }
-.dept-unyu { flex: 1 1 62%; }
+.dept-unyu { flex: 1 1 62%; min-height: 0; }
 
 .dept-header {
   flex: 0 0 auto;
@@ -100,42 +102,71 @@ button:disabled { cursor: default; }
 .dept-doboku .dept-header { background: #d35400; }
 .dept-unyu .dept-header { background: #1f6fb2; }
 
-/* ---------------- 名札ボード(棚)風レイアウト ---------------- */
-/* 実物の出勤・配車札ボードを模した、木札のような縦長プレートを
-   金属棚に並べたイメージ。1人分のタグ(名前・現場・[ダンプ])は
-   すき間なく横に連結する。さらに同じ現場の人同士も隣に並べ、
-   すき間なく連結することで「一つの現場に何台も」を一目で表す。 */
-.tag-shelf {
+/* ---------------- 現場ごとの行(レーン)レイアウト ---------------- */
+/* 画面の主軸は「人」ではなく「現場」。現場(または現場未定・休み・
+   空車・整備・車検など)を1つの横長レーンとして縦に並べ、その中に
+   その現場に入っている人・車両の札を複数横並び(折り返しあり)で
+   表示する。実物の出勤・配車札ボードの「棚」に相当する。 */
+.lane-stack {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 22px 26px;
-  padding: 26px 24px 34px;
-  background-color: #9a9d9f;
-  background-image:
-    linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 12px),
-    repeating-linear-gradient(
-      180deg,
-      rgba(0,0,0,0) 0,
-      rgba(0,0,0,0) 234px,
-      rgba(0,0,0,0.22) 234px,
-      rgba(0,0,0,0.32) 238px,
-      rgba(0,0,0,0) 238px
-    );
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px 30px;
 }
-.shelf-doboku { background-color: #a89c85; }
-.shelf-unyu { background-color: #8f9599; }
+.stack-doboku { background-color: #cfc0a4; }
+.stack-unyu { background-color: #b7c1c8; }
 
-/* 同じ現場の人をまとめる単位。中の人数分だけ列(タグの束)が横に増える。
-   画面幅に収まらない場合はグループ内でも折り返す。 */
-.site-group {
+.lane-empty-msg {
+  font-size: 1.3rem;
+  color: #55524a;
+  padding: 1rem;
+  margin: 0;
+}
+
+.site-lane {
+  flex: 0 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+
+.lane-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.55rem 1.1rem;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.lane-count { font-size: 1rem; font-weight: 700; opacity: 0.9; white-space: nowrap; }
+
+.lane-site-doboku .lane-header { background: #c2540a; }
+.lane-site-unyu .lane-header { background: #175a94; }
+.lane-unassigned-doboku .lane-header,
+.lane-unassigned-unyu .lane-header { background: #6b7280; }
+.lane-absent-doboku .lane-header,
+.lane-absent-unyu .lane-header { background: #7a3b3b; }
+.lane-vehicle-idle .lane-header { background: #27ae60; }
+.lane-vehicle-maintenance .lane-header { background: #8e44ad; }
+.lane-vehicle-inspection .lane-header { background: #e67e22; }
+.lane-vehicle-broken .lane-header { background: #c0392b; }
+.lane-vehicle-suspended .lane-header { background: #5d6470; }
+
+.lane-members {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 0;
+  align-items: flex-start;
+  gap: 12px 14px;
+  padding: 14px;
+  background-color: #ddd5c1;
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 10px);
 }
+.stack-unyu .lane-members { background-color: #ccd4da; }
 
 .tag-cluster {
   display: flex;
@@ -197,6 +228,7 @@ button:disabled { cursor: default; }
   color: #3a3226;
 }
 .tag-info.is-unset { color: #948a76; }
+.tag-info.is-warning { background: #fbe1db; }
 .tag-caption {
   height: 44px;
   font-size: 0.85rem;
@@ -222,6 +254,7 @@ button:disabled { cursor: default; }
   padding: 0.1rem 0.5rem;
   border-radius: 8px;
 }
+.tag-badge-warning { background: #c0392b; }
 
 /* ---------------- モーダル共通 ---------------- */
 .modal-root.hidden { display: none; }
@@ -331,6 +364,7 @@ button:disabled { cursor: default; }
 .choice-absent { background: #fdecea; border-color: #c0392b; color: #922b21; }
 .choice-neutral { background: #f4f4f4; color: #444; }
 .choice-add { background: #eaf6ee; border-color: #27ae60; color: #1e8449; margin-top: 0.2rem; }
+.choice-move { background: #eaf1fb; border-color: #1f6fb2; color: #175a94; }
 .choice-btn.is-current { box-shadow: 0 0 0 4px rgba(31,111,178,0.35) inset; }
 
 .status-choice-available { background: #eafaf1; border-color: #27ae60; color: #1e8449; }
@@ -533,11 +567,11 @@ button:disabled { cursor: default; }
 .vehicle-admin-item { }
 
 /* ---------------- スクロールバー(タッチ操作向けに太め) ---------------- */
-.tag-shelf::-webkit-scrollbar,
+.lane-stack::-webkit-scrollbar,
 .modal-body::-webkit-scrollbar {
   width: 14px;
 }
-.tag-shelf::-webkit-scrollbar-thumb,
+.lane-stack::-webkit-scrollbar-thumb,
 .modal-body::-webkit-scrollbar-thumb {
   background: rgba(0,0,0,0.25);
   border-radius: 8px;
