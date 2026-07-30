@@ -48,6 +48,9 @@
         { id: 'v_5', displayName: '軽トラ1', plateNumber: '', vehicleType: '軽トラ', status: 'available', order: 5, active: true }
       ],
 
+      // 出退勤の打刻記録(日次・月次CSV出力の元データ)
+      attendanceLogs: [],
+
       updatedAt: null
     };
   }

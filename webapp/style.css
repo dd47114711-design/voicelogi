@@ -35,17 +35,28 @@ button:disabled { cursor: default; }
 /* ---------------- ヘッダー ---------------- */
 .app-header {
   flex: 0 0 auto;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.9rem 1.4rem;
+  padding: 0.7rem 1.4rem;
   background: linear-gradient(#4a3423, #2e2013 90%);
   border-bottom: 4px solid #1c1409;
   color: #fff;
 }
-.app-title { font-size: 1.9rem; font-weight: 700; letter-spacing: 0.02em; }
-.header-right { display: flex; align-items: center; gap: 0.9rem; }
-.clock { font-size: 1.2rem; opacity: 0.9; margin-right: 0.4rem; white-space: nowrap; }
+.header-left { justify-self: start; }
+.app-title { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.02em; }
+.header-right { justify-self: end; display: flex; align-items: center; gap: 0.9rem; }
+
+.header-clock { justify-self: center; text-align: center; line-height: 1.05; }
+.clock-time {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 3px rgba(0,0,0,0.4);
+}
+.clock-date { font-size: 1.1rem; opacity: 0.9; margin-top: 0.05rem; }
+
 .header-btn {
   min-height: 56px;
   padding: 0 1.3rem;
@@ -55,6 +66,7 @@ button:disabled { cursor: default; }
   border-radius: 10px;
   background: #33465c;
   color: #fff;
+  white-space: nowrap;
 }
 .header-btn:active { background: #4a6180; }
 
@@ -355,6 +367,60 @@ button:disabled { cursor: default; }
   color: #444;
 }
 .category-btn.is-selected { background: #eaf3fc; border-color: #1f6fb2; color: #1f6fb2; }
+
+/* ---------------- 出退勤記録(CSVダウンロード) ---------------- */
+.records-section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #29486a;
+  margin: 0.6rem 0 0.1rem;
+}
+.date-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.3rem 0 0.7rem;
+}
+.date-nav-btn {
+  flex: 0 0 auto;
+  min-height: 64px;
+  padding: 0 1.1rem;
+  border-radius: 12px;
+  border: 2px solid #ccc;
+  background: #fafafa;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #444;
+  white-space: nowrap;
+}
+.date-display {
+  flex: 1 1 auto;
+  min-height: 64px;
+  border-radius: 12px;
+  background: #eef2f5;
+  color: #1b2733;
+  font-size: 1.4rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.choice-download {
+  background: #eaf6ee;
+  border-color: #27ae60;
+  color: #1e8449;
+  font-size: 1.35rem;
+  min-height: 72px;
+  margin-bottom: 0.6rem;
+}
+.download-status {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e8449;
+  min-height: 1.6rem;
+  margin: 0.4rem 0 0;
+}
 
 /* ---------------- 車両管理 ---------------- */
 .vehicle-admin-item { }

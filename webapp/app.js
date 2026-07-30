@@ -33,9 +33,12 @@
     document.getElementById('btn-vehicle-admin').addEventListener('click', function () {
       openVehicleAdmin();
     });
+    document.getElementById('btn-records').addEventListener('click', function () {
+      openRecordsModal();
+    });
 
     updateClock();
-    setInterval(updateClock, 10000);
+    setInterval(updateClock, 1000);
 
     renderAll();
   }
@@ -47,6 +50,8 @@
       Storage.saveState(fresh);
       return fresh;
     }
+    // 旧バージョンのデータに出退勤記録が無い場合は追加しておく
+    if (!loaded.attendanceLogs) loaded.attendanceLogs = [];
     return loaded;
   }
 
@@ -76,13 +81,38 @@
 
   function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
+  var WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+  function formatDateJP(d) {
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日(' + WEEKDAY_LABELS[d.getDay()] + ')';
+  }
+
+  function formatYMD(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function formatTimeHM(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function formatDurationHM(startIso, endIso) {
+    if (!startIso || !endIso) return '';
+    var ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+    if (ms < 0) return '';
+    var totalMin = Math.round(ms / 60000);
+    var hh = Math.floor(totalMin / 60);
+    var mm = totalMin % 60;
+    return hh + '時間' + pad2(mm) + '分';
+  }
+
   function updateClock() {
     var now = new Date();
-    var days = ['日', '月', '火', '水', '木', '金', '土'];
-    var text = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日(' +
-      days[now.getDay()] + ') ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-    var clockEl = document.getElementById('clock');
-    if (clockEl) clockEl.textContent = text;
+    var timeEl = document.getElementById('clock-time');
+    var dateEl = document.getElementById('clock-date');
+    if (timeEl) timeEl.textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
+    if (dateEl) dateEl.textContent = formatDateJP(now);
   }
 
   // ============================================================
@@ -122,8 +152,25 @@
     var s = findStaff(staffId);
     if (!s) return;
     s.attendance = status;
+    recordAttendanceEvent(s, status === 'present' ? 'in' : 'out');
     persist();
     renderAll();
+  }
+
+  // その日の出勤・退勤時刻を記録する(CSV出力用)。
+  // 同じ人・同じ日のタップは上書きし、最後にタップした時刻を採用する。
+  function recordAttendanceEvent(staff, type) {
+    var now = new Date();
+    var dateStr = formatYMD(now);
+    var rec = state.attendanceLogs.find(function (r) { return r.staffId === staff.id && r.date === dateStr; });
+    if (!rec) {
+      rec = { id: genId('log'), date: dateStr, staffId: staff.id, staffName: staff.name, department: staff.department, clockIn: null, clockOut: null };
+      state.attendanceLogs.push(rec);
+    }
+    rec.staffName = staff.name;
+    rec.department = staff.department;
+    if (type === 'in') rec.clockIn = now.toISOString();
+    if (type === 'out') rec.clockOut = now.toISOString();
   }
 
   function setStaffSite(staffId, siteId) {
@@ -603,6 +650,146 @@
       onClick: close
     }));
     panel.appendChild(footer);
+  }
+
+  // ============================================================
+  // 出退勤記録のCSV出力(日次・月次)
+  // ============================================================
+  var CSV_HEADERS = ['日付', '所属', '氏名', '出勤時刻', '退勤時刻', '勤務時間'];
+
+  function csvEscape(v) {
+    v = (v == null) ? '' : String(v);
+    if (/[",\r\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }
+
+  function buildCsv(records) {
+    var lines = [CSV_HEADERS.map(csvEscape).join(',')];
+    records.forEach(function (r) {
+      lines.push([
+        r.date,
+        DEPT_LABELS[r.department] || r.department,
+        r.staffName,
+        formatTimeHM(r.clockIn),
+        formatTimeHM(r.clockOut),
+        formatDurationHM(r.clockIn, r.clockOut)
+      ].map(csvEscape).join(','));
+    });
+    return '﻿' + lines.join('\r\n');
+  }
+
+  function downloadCsv(filename, csvContent) {
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = h('a', { attrs: { href: url, download: filename } });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function getDailyRecords(dateStr) {
+    var list = state.attendanceLogs.filter(function (r) { return r.date === dateStr && (r.clockIn || r.clockOut); });
+    return sortRecordsForExport(list);
+  }
+
+  function getMonthlyRecords(year, month) {
+    var prefix = year + '-' + pad2(month) + '-';
+    var list = state.attendanceLogs.filter(function (r) { return r.date.indexOf(prefix) === 0 && (r.clockIn || r.clockOut); });
+    return sortRecordsForExport(list);
+  }
+
+  function sortRecordsForExport(list) {
+    return list.slice().sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      if (a.department !== b.department) return a.department < b.department ? -1 : 1;
+      var sa = findStaff(a.staffId), sb = findStaff(b.staffId);
+      return ((sa && sa.order) || 0) - ((sb && sb.order) || 0);
+    });
+  }
+
+  function openRecordsModal() {
+    openModal(function (panel, close) {
+      var today = new Date();
+      buildRecordsContent(panel, close, today, { year: today.getFullYear(), month: today.getMonth() + 1 });
+    });
+  }
+
+  function shiftDate(d, days) {
+    var next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+    return next;
+  }
+
+  function shiftMonth(ym, delta) {
+    var total = ym.year * 12 + (ym.month - 1) + delta;
+    var year = Math.floor(total / 12);
+    var month = (total % 12) + 1;
+    return { year: year, month: month };
+  }
+
+  function buildRecordsContent(panel, close, dailyDate, monthYm) {
+    panel.innerHTML = '';
+    panel.appendChild(modalHeader('出退勤記録のダウンロード', '日付・月を選んでCSV(Excelで開けます)をダウンロードします'));
+
+    var body = h('div', { className: 'modal-body' });
+    var statusMsg = h('p', { className: 'download-status' });
+
+    // ---- 日次 ----
+    body.appendChild(h('div', { className: 'records-section-title', text: '日次(1日分)' }));
+    var dailyNav = h('div', { className: 'date-nav-row' }, [
+      h('button', {
+        className: 'date-nav-btn', text: '◀ 前日', attrs: { type: 'button' },
+        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, -1), monthYm); }
+      }),
+      h('div', { className: 'date-display', text: formatDateJP(dailyDate) }),
+      h('button', {
+        className: 'date-nav-btn', text: '翌日 ▶', attrs: { type: 'button' },
+        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, 1), monthYm); }
+      })
+    ]);
+    body.appendChild(dailyNav);
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-download',
+      attrs: { type: 'button' },
+      text: 'この日の記録をCSVダウンロード',
+      onClick: function () {
+        var dateStr = formatYMD(dailyDate);
+        var records = getDailyRecords(dateStr);
+        downloadCsv('attendance_' + dateStr + '.csv', buildCsv(records));
+        statusMsg.textContent = records.length ? '✔ ' + dateStr + ' の記録(' + records.length + '件)をダウンロードしました。' : '※ この日の記録はまだありません(0件で出力しました)。';
+      }
+    }));
+
+    // ---- 月次 ----
+    body.appendChild(h('div', { className: 'records-section-title', text: '月次(1か月分)' }));
+    var monthNav = h('div', { className: 'date-nav-row' }, [
+      h('button', {
+        className: 'date-nav-btn', text: '◀ 前月', attrs: { type: 'button' },
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, -1)); }
+      }),
+      h('div', { className: 'date-display', text: monthYm.year + '年' + monthYm.month + '月' }),
+      h('button', {
+        className: 'date-nav-btn', text: '翌月 ▶', attrs: { type: 'button' },
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, 1)); }
+      })
+    ]);
+    body.appendChild(monthNav);
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-download',
+      attrs: { type: 'button' },
+      text: 'この月の記録をCSVダウンロード',
+      onClick: function () {
+        var records = getMonthlyRecords(monthYm.year, monthYm.month);
+        var label = monthYm.year + '-' + pad2(monthYm.month);
+        downloadCsv('attendance_' + label + '.csv', buildCsv(records));
+        statusMsg.textContent = records.length ? '✔ ' + monthYm.year + '年' + monthYm.month + '月 の記録(' + records.length + '件)をダウンロードしました。' : '※ この月の記録はまだありません(0件で出力しました)。';
+      }
+    }));
+
+    body.appendChild(statusMsg);
+
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
   }
 
   document.addEventListener('DOMContentLoaded', init);
