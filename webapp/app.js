@@ -23,6 +23,8 @@
 
   var state = null;
   var namesMasked = false;
+  var activeDepartment = 'unyu';
+  var DEPARTMENT_TABS = ['doboku', 'unyu', 'office', 'summary'];
 
   var VEHICLE_STATUS_LABELS = {
     available: '使用可能',
@@ -67,10 +69,41 @@
     document.getElementById('btn-unyu-expand-all').addEventListener('click', function () { setAllLanesOpen('unyu', true); });
     document.getElementById('btn-unyu-collapse-all').addEventListener('click', function () { setAllLanesOpen('unyu', false); });
 
+    var savedDept = Storage.loadActiveDepartment();
+    activeDepartment = DEPARTMENT_TABS.indexOf(savedDept) !== -1 ? savedDept : 'unyu';
+    document.querySelectorAll('.dept-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () { switchDepartment(btn.getAttribute('data-dept')); });
+    });
+    applyActiveDepartmentUI();
+
     updateClock();
     setInterval(updateClock, 1000);
 
     renderAll();
+  }
+
+  // ============================================================
+  // 部門タブ切替: ページ全体を再読み込みせず、同じHTML内で表示対象
+  // (dept-section)だけをCSSで切り替える。データ・イベント処理は
+  // renderAll()側で一括描画しており、タブ切替自体は表示/非表示の
+  // 切り替えのみなので、スクロール位置は要素がDOMに残ったまま
+  // 自然に保持される。
+  // ============================================================
+  function switchDepartment(dept) {
+    if (DEPARTMENT_TABS.indexOf(dept) === -1 || dept === activeDepartment) return;
+    activeDepartment = dept;
+    Storage.saveActiveDepartment(dept);
+    applyActiveDepartmentUI();
+  }
+
+  function applyActiveDepartmentUI() {
+    DEPARTMENT_TABS.forEach(function (dept) {
+      var tab = document.querySelector('.dept-tab[data-dept="' + dept + '"]');
+      var panel = document.querySelector('.dept-section[data-panel="' + dept + '"]');
+      var active = dept === activeDepartment;
+      if (tab) tab.classList.toggle('is-active', active);
+      if (panel) panel.classList.toggle('is-active', active);
+    });
   }
 
   function loadOrInitState() {
@@ -590,6 +623,104 @@
     renderDepartment('unyu-list', 'unyu');
     renderOffice();
     renderVehicleSummaryBar();
+    renderTabCounts();
+    renderSummaryTab();
+  }
+
+  // ============================================================
+  // 部門タブの簡易人数表示 と 全体確認タブの集計
+  // ------------------------------------------------------------
+  // 出勤者数は「その部門のタブに実際に表示される人」(=当日の配置先。
+  // 土木所属で運輸へ配置中の人は運輸側で数える)に合わせ、
+  // buildDepartmentLanes() の絞り込みと同じ条件を使う。休み中の人は
+  // 基本所属のタブで数える(休みレーンの表示条件と合わせる)。
+  // ============================================================
+  function deptAttendanceCounts(department) {
+    var present = state.staff.filter(function (s) {
+      return s.active !== false && s.attendance === 'present' && effectiveDisplayDept(s) === department;
+    }).length;
+    var absent = state.staff.filter(function (s) {
+      return s.active !== false && s.attendance === 'absent' && s.department === department;
+    }).length;
+    return { present: present, absent: absent };
+  }
+
+  function deptActiveGroupCount(department) {
+    return state.dispatchGroups.filter(function (g) {
+      if (g.department !== department || g.active === false) return false;
+      var hasPresentMember = groupMembers(g.id).some(function (s) { return s.attendance === 'present'; });
+      var hasParkedVehicle = department === 'unyu' && state.vehicles.some(function (v) {
+        return v.active !== false && v.todayGroupId === g.id && !findAssignmentForVehicle(v.id);
+      });
+      return hasPresentMember || hasParkedVehicle;
+    }).length;
+  }
+
+  function setTabText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  function renderTabCounts() {
+    var d = deptAttendanceCounts('doboku');
+    setTabText('tab-count-doboku', '出勤' + d.present + '／退勤' + d.absent);
+    var u = deptAttendanceCounts('unyu');
+    var vs = computeVehicleSummary().counts;
+    setTabText('tab-count-unyu', '出勤' + u.present + '／退勤' + u.absent + '／使用' + vs.inUse + '台');
+    var o = deptAttendanceCounts('office');
+    setTabText('tab-count-office', '出勤' + o.present + '／退勤' + o.absent);
+  }
+
+  function summaryStatRow(label, value) {
+    return h('div', { className: 'summary-stat-row' }, [
+      h('span', { className: 'summary-stat-label', text: label }),
+      h('span', { className: 'summary-stat-value', text: value })
+    ]);
+  }
+
+  function renderSummaryTab() {
+    var el = document.getElementById('summary-content');
+    if (!el) return;
+    el.innerHTML = '';
+
+    var doboku = deptAttendanceCounts('doboku');
+    el.appendChild(h('div', { className: 'summary-card summary-card-doboku' }, [
+      h('div', { className: 'summary-card-header', text: '土木' }),
+      h('div', { className: 'summary-card-body' }, [
+        summaryStatRow('出勤', doboku.present + '人'),
+        summaryStatRow('退勤', doboku.absent + '人'),
+        summaryStatRow('稼働現場', deptActiveGroupCount('doboku') + '箇所')
+      ]),
+      h('button', { className: 'summary-open-btn', attrs: { type: 'button' }, text: '土木を開く', onClick: function () { switchDepartment('doboku'); } })
+    ]));
+
+    var unyu = deptAttendanceCounts('unyu');
+    var vs = computeVehicleSummary().counts;
+    el.appendChild(h('div', { className: 'summary-card summary-card-unyu' }, [
+      h('div', { className: 'summary-card-header', text: '運輸' }),
+      h('div', { className: 'summary-card-body' }, [
+        summaryStatRow('出勤', unyu.present + '人'),
+        summaryStatRow('退勤', unyu.absent + '人'),
+        summaryStatRow('稼働配置', deptActiveGroupCount('unyu') + '枠'),
+        summaryStatRow('使用中', vs.inUse + '台'),
+        summaryStatRow('空車', vs.idle + '台'),
+        summaryStatRow('整備', vs.maintenance + '台'),
+        summaryStatRow('車検', vs.inspection + '台'),
+        summaryStatRow('故障', vs.broken + '台'),
+        summaryStatRow('使用停止', vs.suspended + '台')
+      ]),
+      h('button', { className: 'summary-open-btn', attrs: { type: 'button' }, text: '運輸を開く', onClick: function () { switchDepartment('unyu'); } })
+    ]));
+
+    var office = deptAttendanceCounts('office');
+    el.appendChild(h('div', { className: 'summary-card summary-card-office' }, [
+      h('div', { className: 'summary-card-header', text: '事務' }),
+      h('div', { className: 'summary-card-body' }, [
+        summaryStatRow('出勤', office.present + '人'),
+        summaryStatRow('退勤', office.absent + '人')
+      ]),
+      h('button', { className: 'summary-open-btn', attrs: { type: 'button' }, text: '事務を開く', onClick: function () { switchDepartment('office'); } })
+    ]));
   }
 
   var DEPARTMENT_RENDERERS = {
@@ -947,6 +1078,21 @@
     return h('div', { className: 'modal-footer' }, [
       h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close })
     ]);
+  }
+
+  // 部門絞り込みなど、タップだけで切り替える丸みのあるチップ行
+  // (従業員管理・出退勤記録で使用)。プルダウンは使わない。
+  function filterChipRow(options, currentKey, onPick) {
+    var row = h('div', { className: 'filter-chip-row' });
+    options.forEach(function (opt) {
+      row.appendChild(h('button', {
+        className: 'filter-chip' + (opt.key === currentKey ? ' is-active' : ''),
+        attrs: { type: 'button' },
+        text: opt.label,
+        onClick: function () { onPick(opt.key); }
+      }));
+    });
+    return row;
   }
 
   // ============================================================
@@ -2524,36 +2670,62 @@
     });
   }
 
-  function buildStaffAdminContent(panel, close) {
+  var STAFF_ADMIN_FILTERS = [
+    { key: 'all', label: '全員' },
+    { key: 'doboku', label: '土木' },
+    { key: 'unyu', label: '運輸' },
+    { key: 'office', label: '事務' },
+    { key: 'retired', label: '退職者' }
+  ];
+
+  function buildStaffAdminContent(panel, close, filter) {
+    filter = filter || 'all';
     panel.innerHTML = '';
-    var backHere = function () { buildStaffAdminContent(panel, close); };
-    panel.appendChild(modalHeader('従業員管理', '従業員をタップして編集してください'));
+    var backHere = function () { buildStaffAdminContent(panel, close, filter); };
+    panel.appendChild(modalHeader('従業員管理', '部門をタップして絞り込み、従業員をタップして編集してください'));
+    panel.appendChild(filterChipRow(STAFF_ADMIN_FILTERS, filter, function (key) { buildStaffAdminContent(panel, close, key); }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
-    DEPARTMENT_ORDER_ADMIN.forEach(function (dept) {
-      var list = sortByOrder(state.staff.filter(function (s) { return s.department === dept && s.active !== false; }));
-      if (!list.length) return;
-      body.appendChild(h('div', { className: 'records-section-title', text: DEPT_LABELS[dept] + '部門' }));
-      list.forEach(function (s) {
+
+    if (filter === 'retired') {
+      var retired = sortByOrder(state.staff.filter(function (s) { return s.active === false; }));
+      if (!retired.length) body.appendChild(h('p', { className: 'record-empty', text: '退職者はいません。' }));
+      retired.forEach(function (s) {
         body.appendChild(h('button', {
           className: 'list-btn staff-admin-item', attrs: { type: 'button' },
-          onClick: function () { buildStaffEditMenu(panel, s.id, close, backHere); }
+          onClick: function () { buildStaffReactivateConfirm(panel, s.id, close, backHere); }
         }, [
           h('span', { className: 'list-btn-text', text: s.name }),
-          h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
-          h('span', { className: 'list-btn-tag', text: (s.workRoles || []).map(function (r) { return ROLE_LABELS[r] || r; }).join('・') })
+          h('span', { className: 'list-btn-tag', text: DEPT_LABELS[s.department] })
         ]));
       });
-    });
+    } else {
+      var depts = filter === 'all' ? DEPARTMENT_ORDER_ADMIN : [filter];
+      var any = false;
+      depts.forEach(function (dept) {
+        var list = sortByOrder(state.staff.filter(function (s) { return s.department === dept && s.active !== false; }));
+        if (!list.length) return;
+        any = true;
+        if (filter === 'all') body.appendChild(h('div', { className: 'records-section-title', text: DEPT_LABELS[dept] + '部門' }));
+        list.forEach(function (s) {
+          body.appendChild(h('button', {
+            className: 'list-btn staff-admin-item', attrs: { type: 'button' },
+            onClick: function () { buildStaffEditMenu(panel, s.id, close, backHere); }
+          }, [
+            h('span', { className: 'list-btn-text', text: s.name }),
+            h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
+            h('span', { className: 'list-btn-tag', text: (s.workRoles || []).map(function (r) { return ROLE_LABELS[r] || r; }).join('・') })
+          ]));
+        });
+      });
+      if (!any) body.appendChild(h('p', { className: 'record-empty', text: '該当する従業員がいません。' }));
+    }
+
     panel.appendChild(body);
 
     panel.appendChild(h('button', {
       className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '＋ 新しい従業員を追加',
       onClick: function () { buildStaffAddForm(panel, close, backHere); }
-    }));
-    panel.appendChild(h('button', {
-      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '退職者一覧',
-      onClick: function () { buildRetiredStaffList(panel, close, backHere); }
     }));
     panel.appendChild(cancelBar(close));
   }
@@ -2882,31 +3054,15 @@
     panel.appendChild(cancelBar(onBack));
   }
 
-  function buildRetiredStaffList(panel, close, onBack) {
+  function buildStaffReactivateConfirm(panel, staffId, close, onBack) {
     panel.innerHTML = '';
-    panel.appendChild(modalHeader('退職者一覧', 'タップすると再有効化できます'));
-    var body = h('div', { className: 'modal-body scroll-list' });
-    var list = sortByOrder(state.staff.filter(function (s) { return s.active === false; }));
-    if (!list.length) body.appendChild(h('p', { className: 'record-empty', text: '退職者はいません。' }));
-    list.forEach(function (s) {
-      body.appendChild(h('button', {
-        className: 'list-btn staff-admin-item', attrs: { type: 'button' },
-        onClick: function () {
-          panel.innerHTML = '';
-          panel.appendChild(modalHeader(s.name + 'さんを再有効化しますか？', '通常勤務の対象に戻します。'));
-          var cbody = h('div', { className: 'modal-body big-choice-list' });
-          cbody.appendChild(h('button', {
-            className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '再有効化する',
-            onClick: function () { s.active = true; persist(); renderAll(); showToast(s.name, '再有効化しました'); close(); }
-          }));
-          panel.appendChild(cbody);
-          panel.appendChild(cancelBar(function () { buildRetiredStaffList(panel, close, onBack); }));
-        }
-      }, [
-        h('span', { className: 'list-btn-text', text: s.name }),
-        h('span', { className: 'list-btn-tag', text: DEPT_LABELS[s.department] })
-      ]));
-    });
+    var s = findStaff(staffId);
+    panel.appendChild(modalHeader(s.name + 'さんを再有効化しますか？', '通常勤務の対象に戻します。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '再有効化する',
+      onClick: function () { s.active = true; persist(); renderAll(); showToast(s.name, '再有効化しました'); close(); }
+    }));
     panel.appendChild(body);
     panel.appendChild(cancelBar(onBack));
   }
@@ -3007,10 +3163,17 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
+  var RECORDS_FILTERS = [
+    { key: 'all', label: '全員' },
+    { key: 'doboku', label: '土木' },
+    { key: 'unyu', label: '運輸' },
+    { key: 'office', label: '事務' }
+  ];
+
   function openRecordsModal() {
     openModal(function (panel, close) {
       var today = new Date();
-      buildRecordsContent(panel, close, today, { year: today.getFullYear(), month: today.getMonth() + 1 }, 'summary');
+      buildRecordsContent(panel, close, today, { year: today.getFullYear(), month: today.getMonth() + 1 }, 'summary', 'all');
     });
   }
 
@@ -3025,23 +3188,27 @@
     return { year: year, month: month };
   }
 
-  function buildRecordsContent(panel, close, dailyDate, monthYm, dailyView) {
+  function buildRecordsContent(panel, close, dailyDate, monthYm, dailyView, deptFilter) {
+    deptFilter = deptFilter || 'all';
+    var deptLabelFilter = deptFilter === 'all' ? null : DEPT_LABELS[deptFilter];
     panel.innerHTML = '';
     panel.appendChild(modalHeader('出退勤記録', '日付・月を選んでCSV(Excelで開けます)をダウンロード、または操作履歴を確認できます'));
 
     var body = h('div', { className: 'modal-body scroll-list' });
     var statusMsg = h('p', { className: 'download-status' });
 
+    body.appendChild(filterChipRow(RECORDS_FILTERS, deptFilter, function (key) { buildRecordsContent(panel, close, dailyDate, monthYm, dailyView, key); }));
+
     body.appendChild(h('div', { className: 'records-section-title', text: '日次(1日分)' }));
     var dailyNav = h('div', { className: 'date-nav-row' }, [
       h('button', {
         className: 'date-nav-btn', text: '◀ 前日', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, -1), monthYm, dailyView); }
+        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, -1), monthYm, dailyView, deptFilter); }
       }),
       h('div', { className: 'date-display', text: formatDateJP(dailyDate) }),
       h('button', {
         className: 'date-nav-btn', text: '翌日 ▶', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, 1), monthYm, dailyView); }
+        onClick: function () { buildRecordsContent(panel, close, shiftDate(dailyDate, 1), monthYm, dailyView, deptFilter); }
       })
     ]);
     body.appendChild(dailyNav);
@@ -3052,18 +3219,18 @@
       h('button', {
         className: 'tab-btn' + (dailyView === 'summary' ? ' is-active' : ''),
         attrs: { type: 'button' }, text: '日次集計',
-        onClick: function () { buildRecordsContent(panel, close, dailyDate, monthYm, 'summary'); }
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, monthYm, 'summary', deptFilter); }
       }),
       h('button', {
         className: 'tab-btn' + (dailyView === 'history' ? ' is-active' : ''),
         attrs: { type: 'button' }, text: '操作履歴',
-        onClick: function () { buildRecordsContent(panel, close, dailyDate, monthYm, 'history'); }
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, monthYm, 'history', deptFilter); }
       })
     ]);
     body.appendChild(tabRow);
 
     if (dailyView === 'history') {
-      var events = state.attendanceLogs.filter(function (r) { return r.date === dateStr; })
+      var events = state.attendanceLogs.filter(function (r) { return r.date === dateStr && (!deptLabelFilter || r.department === deptLabelFilter); })
         .slice().sort(function (a, b) { return a.timestamp < b.timestamp ? -1 : (a.timestamp > b.timestamp ? 1 : 0); });
       if (!events.length) {
         body.appendChild(h('p', { className: 'record-empty', text: 'この日の操作履歴はありません。' }));
@@ -3077,7 +3244,7 @@
         });
       }
     } else {
-      var summaryRows = buildDailyAggregatedRows(dateStr);
+      var summaryRows = buildDailyAggregatedRows(dateStr).filter(function (r) { return !deptLabelFilter || r.department === deptLabelFilter; });
       if (!summaryRows.length) {
         body.appendChild(h('p', { className: 'record-empty', text: 'この日の記録はまだありません。' }));
       } else {
@@ -3104,31 +3271,43 @@
     body.appendChild(h('button', {
       className: 'choice-btn choice-download',
       attrs: { type: 'button' },
-      text: 'この日の記録をCSVダウンロード',
+      text: deptFilter === 'all' ? 'この日の記録をCSVダウンロード' : 'この日の記録をCSVダウンロード(全員)',
       onClick: function () {
         var rows = buildDailyAggregatedRows(dateStr);
         downloadCsv('attendance_' + dateStr + '.csv', buildCsv(rows));
         statusMsg.textContent = rows.length ? '✔ ' + dateStr + ' の記録(' + rows.length + '人分)をダウンロードしました。' : '※ この日の記録はまだありません(0件で出力しました)。';
       }
     }));
+    if (deptFilter !== 'all') {
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-download',
+        attrs: { type: 'button' },
+        text: 'この日の記録をCSVダウンロード(' + deptLabelFilter + 'だけ)',
+        onClick: function () {
+          var rows = buildDailyAggregatedRows(dateStr).filter(function (r) { return r.department === deptLabelFilter; });
+          downloadCsv('attendance_' + dateStr + '_' + deptFilter + '.csv', buildCsv(rows));
+          statusMsg.textContent = rows.length ? '✔ ' + dateStr + ' の' + deptLabelFilter + 'の記録(' + rows.length + '人分)をダウンロードしました。' : '※ この日の' + deptLabelFilter + 'の記録はまだありません(0件で出力しました)。';
+        }
+      }));
+    }
 
     body.appendChild(h('div', { className: 'records-section-title', text: '月次(1か月分)' }));
     var monthNav = h('div', { className: 'date-nav-row' }, [
       h('button', {
         className: 'date-nav-btn', text: '◀ 前月', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, -1), dailyView); }
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, -1), dailyView, deptFilter); }
       }),
       h('div', { className: 'date-display', text: monthYm.year + '年' + monthYm.month + '月' }),
       h('button', {
         className: 'date-nav-btn', text: '翌月 ▶', attrs: { type: 'button' },
-        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, 1), dailyView); }
+        onClick: function () { buildRecordsContent(panel, close, dailyDate, shiftMonth(monthYm, 1), dailyView, deptFilter); }
       })
     ]);
     body.appendChild(monthNav);
     body.appendChild(h('button', {
       className: 'choice-btn choice-download',
       attrs: { type: 'button' },
-      text: 'この月の記録をCSVダウンロード',
+      text: deptFilter === 'all' ? 'この月の記録をCSVダウンロード' : 'この月の記録をCSVダウンロード(全員)',
       onClick: function () {
         var rows = buildMonthlyAggregatedRows(monthYm.year, monthYm.month);
         var label = monthYm.year + '-' + pad2(monthYm.month);
@@ -3136,6 +3315,19 @@
         statusMsg.textContent = rows.length ? '✔ ' + monthYm.year + '年' + monthYm.month + '月 の記録(' + rows.length + '件)をダウンロードしました。' : '※ この月の記録はまだありません(0件で出力しました)。';
       }
     }));
+    if (deptFilter !== 'all') {
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-download',
+        attrs: { type: 'button' },
+        text: 'この月の記録をCSVダウンロード(' + deptLabelFilter + 'だけ)',
+        onClick: function () {
+          var rows = buildMonthlyAggregatedRows(monthYm.year, monthYm.month).filter(function (r) { return r.department === deptLabelFilter; });
+          var label = monthYm.year + '-' + pad2(monthYm.month) + '_' + deptFilter;
+          downloadCsv('attendance_' + label + '.csv', buildCsv(rows));
+          statusMsg.textContent = rows.length ? '✔ ' + monthYm.year + '年' + monthYm.month + '月 の' + deptLabelFilter + 'の記録(' + rows.length + '件)をダウンロードしました。' : '※ この月の' + deptLabelFilter + 'の記録はまだありません(0件で出力しました)。';
+        }
+      }));
+    }
 
     body.appendChild(statusMsg);
 

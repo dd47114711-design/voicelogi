@@ -27,9 +27,27 @@
     </div>
   </header>
 
+  <nav class="dept-tabs" id="dept-tabs" aria-label="部門切替">
+    <button class="dept-tab dept-tab-doboku" data-dept="doboku" type="button">
+      <span class="dept-tab-name">土木</span>
+      <span class="dept-tab-count" id="tab-count-doboku"></span>
+    </button>
+    <button class="dept-tab dept-tab-unyu" data-dept="unyu" type="button">
+      <span class="dept-tab-name">運輸</span>
+      <span class="dept-tab-count" id="tab-count-unyu"></span>
+    </button>
+    <button class="dept-tab dept-tab-office" data-dept="office" type="button">
+      <span class="dept-tab-name">事務</span>
+      <span class="dept-tab-count" id="tab-count-office"></span>
+    </button>
+    <button class="dept-tab dept-tab-summary" data-dept="summary" type="button">
+      <span class="dept-tab-name">全体確認</span>
+    </button>
+  </nav>
+
   <main id="board">
 
-    <section class="dept-section dept-doboku">
+    <section class="dept-section dept-doboku" data-panel="doboku">
       <div class="dept-header">
         <span class="dept-icon">🚧</span>
         <span class="dept-name">土木部門</span>
@@ -42,7 +60,7 @@
       <div id="doboku-list" class="lane-stack stack-doboku"></div>
     </section>
 
-    <section class="dept-section dept-unyu">
+    <section class="dept-section dept-unyu" data-panel="unyu">
       <div class="dept-header">
         <span class="dept-icon">🚚</span>
         <span class="dept-name">運輸部門</span>
@@ -60,12 +78,20 @@
       <div id="unyu-list" class="lane-stack stack-unyu"></div>
     </section>
 
-    <section class="dept-section dept-office">
+    <section class="dept-section dept-office" data-panel="office">
       <div class="dept-header">
         <span class="dept-icon">🗂️</span>
         <span class="dept-name">事務部門</span>
       </div>
       <div id="office-list" class="office-grid"></div>
+    </section>
+
+    <section class="dept-section dept-summary" data-panel="summary">
+      <div class="dept-header">
+        <span class="dept-icon">📊</span>
+        <span class="dept-name">全体確認</span>
+      </div>
+      <div id="summary-content" class="summary-content"></div>
     </section>
 
   </main>

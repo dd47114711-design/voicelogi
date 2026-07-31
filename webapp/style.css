@@ -82,14 +82,49 @@ button:disabled { cursor: default; }
 }
 
 .dept-section {
-  display: flex;
+  display: none;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+  flex: 1 1 auto;
 }
-.dept-doboku { flex: 0 1 34%; min-height: 190px; }
-.dept-unyu { flex: 1 1 56%; min-height: 0; }
-.dept-office { flex: 0 0 auto; max-height: 26%; }
+.dept-section.is-active { display: flex; }
+
+/* ---------------- 部門切替タブ(ヘッダー直下に固定) ---------------- */
+.dept-tabs {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  background: #1c1409;
+  border-bottom: 3px solid #000;
+}
+.dept-tab {
+  min-height: 84px;
+  border: 3px solid transparent;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.5rem;
+  background: #d8d2c4;
+  color: #4a4438;
+}
+.dept-tab-name { font-size: 1.55rem; font-weight: 800; }
+.dept-tab-count { font-size: 1rem; font-weight: 700; opacity: 0.85; white-space: nowrap; }
+
+.dept-tab-doboku { background: #f3ddc8; color: #8a4a12; }
+.dept-tab-unyu { background: #d7e6f3; color: #1f4f74; }
+.dept-tab-office { background: #e3d7f0; color: #4a2f74; }
+.dept-tab-summary { background: #d9dade; color: #37424c; }
+
+.dept-tab-doboku.is-active { background: #d35400; color: #fff; border-color: #ffdcb8; }
+.dept-tab-unyu.is-active { background: #1f6fb2; color: #fff; border-color: #cfe6ff; }
+.dept-tab-office.is-active { background: #6b4fa0; color: #fff; border-color: #e6d9ff; }
+.dept-tab-summary.is-active { background: #37424c; color: #fff; border-color: #d4d8dc; }
 
 .dept-header {
   flex: 0 0 auto;
@@ -105,6 +140,7 @@ button:disabled { cursor: default; }
 .dept-doboku .dept-header { background: #d35400; }
 .dept-unyu .dept-header { background: #1f6fb2; }
 .dept-office .dept-header { background: #6b4fa0; }
+.dept-summary .dept-header { background: #37424c; }
 
 .dept-header > .dept-action-btn { margin-left: auto; }
 .dept-header-actions {
@@ -736,12 +772,13 @@ button:disabled { cursor: default; }
 
 /* ---------------- 事務部門(現場・ダンプを持たない、氏名+出退勤のみ) ---------------- */
 .office-grid {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 14px;
   padding: 18px 20px 24px;
   background-color: #d9d2e6;
@@ -752,6 +789,81 @@ button:disabled { cursor: default; }
   padding: 0.6rem 0.2rem;
   margin: 0;
 }
+
+/* ---------------- 全体確認タブ ---------------- */
+.summary-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px 24px 32px;
+  background-color: #eceae4;
+}
+.summary-card {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  background: #fff;
+}
+.summary-card-header {
+  padding: 0.75rem 1.3rem;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+}
+.summary-card-doboku .summary-card-header { background: #d35400; }
+.summary-card-unyu .summary-card-header { background: #1f6fb2; }
+.summary-card-office .summary-card-header { background: #6b4fa0; }
+.summary-card-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1.6rem;
+  padding: 1.1rem 1.3rem;
+}
+.summary-stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 150px;
+}
+.summary-stat-label { font-size: 1.15rem; color: #666; font-weight: 700; }
+.summary-stat-value { font-size: 1.75rem; color: #1b2733; font-weight: 800; }
+.summary-open-btn {
+  display: block;
+  margin: 0 1.3rem 1.3rem;
+  width: calc(100% - 2.6rem);
+  min-height: 68px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+}
+.summary-card-doboku .summary-open-btn { background: #c2540a; }
+.summary-card-unyu .summary-open-btn { background: #175a94; }
+.summary-card-office .summary-open-btn { background: #5a3f8c; }
+
+/* ---------------- 部門絞り込みチップ(従業員管理・出退勤記録) ---------------- */
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.3rem 0 0.9rem;
+}
+.filter-chip {
+  min-height: 60px;
+  padding: 0 1.2rem;
+  border-radius: 30px;
+  border: 2px solid #ccc;
+  background: #fafafa;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #555;
+}
+.filter-chip.is-active { background: #1f6fb2; border-color: #1f6fb2; color: #fff; }
 
 /* ---------------- 従業員管理 ---------------- */
 .staff-admin-item .list-btn-tag { margin-right: 0.3rem; }

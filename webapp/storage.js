@@ -14,6 +14,7 @@
  */
 (function (global) {
   var STORAGE_KEY = 'voicelogi_attendance_dispatch_v1';
+  var ACTIVE_DEPARTMENT_KEY = 'voicelogi_active_department_v1';
 
   var Storage = {
     /**
@@ -49,6 +50,26 @@
      */
     clearState: function () {
       localStorage.removeItem(STORAGE_KEY);
+    },
+
+    /**
+     * 最後に開いていた部門タブ(doboku/unyu/office/summary)。
+     * 業務データではなく画面の好みなので、別キーで保存する。
+     */
+    loadActiveDepartment: function () {
+      try {
+        return localStorage.getItem(ACTIVE_DEPARTMENT_KEY);
+      } catch (e) {
+        return null;
+      }
+    },
+
+    saveActiveDepartment: function (dept) {
+      try {
+        localStorage.setItem(ACTIVE_DEPARTMENT_KEY, dept);
+      } catch (e) {
+        // 保存できなくても画面表示自体は継続する
+      }
     }
   };
 
