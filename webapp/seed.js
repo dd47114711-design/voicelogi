@@ -18,7 +18,7 @@
       version: 1,
       staff: [
         // ---- 土木部門 ----
-        // 黒瀬大祐・黒瀬裕(専務)・黒瀬剛(社長)は土木の現場にも入るため、
+        // 黒瀬大祐(専務)・黒瀬剛(代表取締役)は土木の現場にも入るため、
         // 通常はダンプを持たないが、必要な日だけ本人の名前タップから
         // 「ダンプを選択」して運輸のダンプに乗ることができる。
         { id: 'st_1', name: '黒瀬大祐', department: 'doboku', attendance: 'absent',
@@ -33,12 +33,16 @@
           normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 5, active: true },
         { id: 'st_6', name: '川脇諒', department: 'doboku', attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 6, active: true },
-        { id: 'st_7', name: '黒瀬裕', department: 'doboku', attendance: 'absent',
+        { id: 'st_7', name: '黒瀬裕大観', department: 'doboku', attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 7, active: true },
         { id: 'st_8', name: '黒瀬剛', department: 'doboku', attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 8, active: true },
         { id: 'st_9', name: '水口経光', department: 'doboku', attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 9, active: true },
+        { id: 'st_30', name: '渡邊啓一', department: 'doboku', attendance: 'absent',
+          normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 10, active: true },
+        { id: 'st_31', name: '秋山英行', department: 'doboku', attendance: 'absent',
+          normalVehicleId: null, todayVehicleId: null, todaySiteId: null, order: 11, active: true },
 
         // ---- 運輸部門(ダンプ運転手。通常ダンプは車番と対応) ----
         { id: 'st_10', name: '森元義紀', department: 'unyu', attendance: 'absent',
