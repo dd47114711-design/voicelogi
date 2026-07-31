@@ -18,6 +18,8 @@
       <div id="clock-date" class="clock-date"></div>
     </div>
     <div class="header-right">
+      <button id="btn-name-toggle" class="header-btn" type="button">氏名を黒塗り</button>
+      <button id="btn-staff-admin" class="header-btn" type="button">従業員管理</button>
       <button id="btn-records" class="header-btn" type="button">出退勤記録</button>
       <button id="btn-vehicle-admin" class="header-btn" type="button">車両管理</button>
       <button id="btn-reset-data" class="header-btn header-btn-danger" type="button">保存データ消去</button>
@@ -56,6 +58,14 @@
         <button id="btn-unyu-collapse-all" class="toolbar-btn" type="button">すべて閉じる</button>
       </div>
       <div id="unyu-list" class="lane-stack stack-unyu"></div>
+    </section>
+
+    <section class="dept-section dept-office">
+      <div class="dept-header">
+        <span class="dept-icon">🗂️</span>
+        <span class="dept-name">事務部門</span>
+      </div>
+      <div id="office-list" class="office-grid"></div>
     </section>
 
   </main>

@@ -87,8 +87,9 @@ button:disabled { cursor: default; }
   overflow: hidden;
   min-height: 0;
 }
-.dept-doboku { flex: 0 1 38%; min-height: 210px; }
-.dept-unyu { flex: 1 1 62%; min-height: 0; }
+.dept-doboku { flex: 0 1 34%; min-height: 190px; }
+.dept-unyu { flex: 1 1 56%; min-height: 0; }
+.dept-office { flex: 0 0 auto; max-height: 26%; }
 
 .dept-header {
   flex: 0 0 auto;
@@ -103,6 +104,7 @@ button:disabled { cursor: default; }
 .dept-icon { font-size: 1.7rem; }
 .dept-doboku .dept-header { background: #d35400; }
 .dept-unyu .dept-header { background: #1f6fb2; }
+.dept-office .dept-header { background: #6b4fa0; }
 
 .dept-header > .dept-action-btn { margin-left: auto; }
 .dept-header-actions {
@@ -261,7 +263,8 @@ button:disabled { cursor: default; }
 .tag {
   min-width: 96px;
   width: auto;
-  height: 208px;
+  min-height: 208px;
+  height: auto;
   border: 1px solid rgba(0,0,0,0.15);
   border-radius: 8px;
   padding: 0.6rem 0.5rem;
@@ -299,7 +302,8 @@ button:disabled { cursor: default; }
 .tcy { text-combine-upright: all; }
 
 .tag-name-text {
-  height: 168px;
+  min-height: 168px;
+  height: auto;
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.3;
@@ -315,6 +319,11 @@ button:disabled { cursor: default; }
 .tag-name.is-present { background: #fbfaf7; color: #1b2733; }
 .tag-name.is-absent { background: #b6362a; color: #fff8f6; }
 .tag-name.is-absent .tag-name-text { color: #fff8f6; }
+
+/* 氏名黒塗りモード: 名前の文字は描画せず、札全体を黒い長方形にする
+   (透けたり一部だけ見えたりしないよう、文字ノード自体を出力しない)。 */
+.tag-name.is-masked { background: #12141a; border-color: #000; }
+.tag-name.is-masked .tag-name-text { background: #000; min-height: 168px; }
 
 .tag-info {
   min-width: 108px;
@@ -724,6 +733,53 @@ button:disabled { cursor: default; }
 .toast.toast-show { opacity: 1; transform: translate(-50%, 0); }
 .toast-name { font-size: 1.3rem; font-weight: 800; }
 .toast-message { font-size: 1.1rem; margin-top: 0.15rem; }
+
+/* ---------------- 事務部門(現場・ダンプを持たない、氏名+出退勤のみ) ---------------- */
+.office-grid {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 18px 20px 24px;
+  background-color: #d9d2e6;
+}
+.office-empty-msg {
+  font-size: 1.2rem;
+  color: #55524a;
+  padding: 0.6rem 0.2rem;
+  margin: 0;
+}
+
+/* ---------------- 従業員管理 ---------------- */
+.staff-admin-item .list-btn-tag { margin-right: 0.3rem; }
+.reorder-row { display: flex; align-items: center; gap: 0.5rem; }
+.reorder-btn {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 56px;
+  border-radius: 10px;
+  border: 2px solid #ccc;
+  background: #fafafa;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #444;
+}
+.reorder-btn:disabled { opacity: 0.3; }
+.role-btn-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.3rem; }
+.role-btn {
+  flex: 1 1 30%;
+  min-height: 64px;
+  border-radius: 10px;
+  border: 2px solid #ccc;
+  background: #fafafa;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #444;
+}
+.role-btn.is-selected { background: #eaf3fc; border-color: #1f6fb2; color: #1f6fb2; }
 
 /* ---------------- 車両管理 ---------------- */
 .vehicle-admin-item { }
