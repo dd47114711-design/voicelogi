@@ -69,6 +69,8 @@ button:disabled { cursor: default; }
   white-space: nowrap;
 }
 .header-btn:active { background: #4a6180; }
+.header-btn-danger { background: #7a3b3b; }
+.header-btn-danger:active { background: #922b21; }
 
 /* ---------------- 全体レイアウト ---------------- */
 #board {

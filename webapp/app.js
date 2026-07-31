@@ -33,6 +33,9 @@
     document.getElementById('btn-vehicle-admin').addEventListener('click', function () {
       openVehicleAdmin();
     });
+    document.getElementById('btn-reset-data').addEventListener('click', function () {
+      openResetDataConfirm();
+    });
     document.getElementById('btn-records').addEventListener('click', function () {
       openRecordsModal();
     });
@@ -1480,6 +1483,36 @@
     persist();
     renderAll();
     showToast(s.name, '配車を解除しました');
+  }
+
+  // ============================================================
+  // 保存データの消去(ブラウザに保存された古いデータを最新の初期データへ戻す)
+  // ============================================================
+  // localStorageは一度保存されるとseed.jsを更新しても上書きされないため、
+  // 動作確認中などに最新の初期データへ戻したいときに使う。
+  function openResetDataConfirm() {
+    openModal(function (panel, close) {
+      panel.appendChild(modalHeader(
+        '保存データを消去しますか？',
+        '出退勤・配車の記録を含め、このブラウザに保存されているデータをすべて消去し、最新の初期データに戻します。この操作は取り消せません。'
+      ));
+      var body = h('div', { className: 'modal-body big-choice-list' });
+      body.appendChild(h('button', {
+        className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '消去して初期データに戻す',
+        onClick: function () {
+          Storage.clearState();
+          state = createSeedState();
+          persist();
+          close();
+          renderAll();
+          showToast('保存データを消去しました', '最新の初期データに戻りました');
+        }
+      }));
+      panel.appendChild(body);
+      var footer = h('div', { className: 'modal-footer' });
+      footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+      panel.appendChild(footer);
+    });
   }
 
   // ============================================================
