@@ -520,7 +520,13 @@
 
     sites.forEach(function (site) {
       var members = sortByOrder(presentStaff.filter(function (s) { return s.todaySiteId === site.id; }));
-      if (members.length) {
+      // 運転手なしでダンプだけがその現場に駐車している場合も、
+      // レーン自体は作る(そうしないと、運転手が誰もいない現場の
+      // 駐車車両が空車一覧にも現場一覧にも出ず、見えなくなってしまう)。
+      var hasParkedVehicle = department === 'unyu' && state.vehicles.some(function (v) {
+        return v.active !== false && v.todaySiteId === site.id && !findDriverUsingVehicle(v.id, null);
+      });
+      if (members.length || hasParkedVehicle) {
         lanes.push({ kind: 'site', key: site.id, label: site.name, members: members });
       }
     });
