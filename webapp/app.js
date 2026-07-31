@@ -596,9 +596,11 @@
     return !!(staff.todayGroupId && staff.todayGroupId !== targetGroupId);
   }
 
-  // present中の人は「今いる配置グループの部門」で盤面に表示する
-  // (土木の人が運輸の配置に入った日は運輸側に出る)。未配置・休みの
-  // 人は基本所属(department)で表示する。出退勤CSVは常にdepartmentを使う。
+  // 出勤・退勤に関わらず「今配置されている配置グループの部門」で
+  // 盤面に表示する(土木の人が運輸の配置に入っている間は、退勤しても
+  // 運輸側に札が残ったまま白/赤が切り替わるだけ)。配置枠から外れた
+  // (todayGroupIdが無い)人だけ基本所属(department)で表示する。
+  // 出退勤CSVは常にdepartmentを使う。
   function effectiveDisplayDept(staff) {
     if (staff.todayGroupId) {
       var g = findGroup(staff.todayGroupId);
@@ -639,29 +641,31 @@
   // ============================================================
   // 部門タブの簡易人数表示 と 全体確認タブの集計
   // ------------------------------------------------------------
-  // 出勤者数は「その部門のタブに実際に表示される人」(=当日の配置先。
-  // 土木所属で運輸へ配置中の人は運輸側で数える)に合わせ、
-  // buildDepartmentLanes() の絞り込みと同じ条件を使う。休み中の人は
-  // 基本所属のタブで数える(休みレーンの表示条件と合わせる)。
+  // 出勤者数・退勤者数とも「その部門のタブに実際に表示される人」
+  // (=当日の配置先。配置枠から外れていない限り、退勤しても表示先は
+  // 変わらない)に合わせ、buildDepartmentLanes() と同じ条件を使う。
   // ============================================================
   function deptAttendanceCounts(department) {
     var present = state.staff.filter(function (s) {
       return s.active !== false && s.attendance === 'present' && effectiveDisplayDept(s) === department;
     }).length;
     var absent = state.staff.filter(function (s) {
-      return s.active !== false && s.attendance === 'absent' && s.department === department;
+      return s.active !== false && s.attendance === 'absent' && effectiveDisplayDept(s) === department;
     }).length;
     return { present: present, absent: absent };
   }
 
+  // 「稼働現場/稼働配置」は、盤面にその配置枠のレーンが表示されて
+  // いるかどうか(=出勤・退勤に関わらず誰か配置されている、または
+  // 運転手なしのダンプが駐車中)と揃える。
   function deptActiveGroupCount(department) {
     return state.dispatchGroups.filter(function (g) {
       if (g.department !== department || g.active === false) return false;
-      var hasPresentMember = groupMembers(g.id).some(function (s) { return s.attendance === 'present'; });
+      var hasMember = groupMembers(g.id).length > 0;
       var hasParkedVehicle = department === 'unyu' && state.vehicles.some(function (v) {
         return v.active !== false && v.todayGroupId === g.id && !findAssignmentForVehicle(v.id);
       });
-      return hasPresentMember || hasParkedVehicle;
+      return hasMember || hasParkedVehicle;
     }).length;
   }
 
@@ -766,9 +770,14 @@
   // 部門Dの盤面を「配置グループ(lane.kind==='site')・現場未定・
   // (運輸のみ)車両状態・休み」のレーン一覧として組み立てる。
   // 現場名だけでグルーピングせず、必ずgroupIdを介して分類する。
+  //
+  // 出退勤タップは配置(todayGroupId)を一切変えない(setAttendance参照)。
+  // 実物の名札ボードと同じく、配置枠に入っている人は退勤しても
+  // その配置枠のレーンに残ったまま名前札の色が白→赤に変わるだけで、
+  // 「休み」レーンへは動かない。「休み」レーンに入るのは、そもそも
+  // どの配置枠にも入っていない(todayGroupIdが無い)人だけ。
   function buildDepartmentLanes(department) {
-    var presentStaff = state.staff.filter(function (s) { return s.active !== false && s.attendance === 'present' && effectiveDisplayDept(s) === department; });
-    var absentStaff = state.staff.filter(function (s) { return s.active !== false && s.attendance === 'absent' && s.department === department; });
+    var deptStaff = state.staff.filter(function (s) { return s.active !== false && effectiveDisplayDept(s) === department; });
 
     var lanes = [];
 
@@ -784,7 +793,7 @@
     });
 
     groups.forEach(function (g) {
-      var members = sortByOrder(presentStaff.filter(function (s) { return s.todayGroupId === g.id; }));
+      var members = sortByOrder(deptStaff.filter(function (s) { return s.todayGroupId === g.id; }));
       var hasParkedVehicle = department === 'unyu' && state.vehicles.some(function (v) {
         return v.active !== false && v.todayGroupId === g.id && !findAssignmentForVehicle(v.id);
       });
@@ -793,9 +802,10 @@
       }
     });
 
-    var unassigned = sortByOrder(presentStaff.filter(function (s) { return !s.todayGroupId; }));
-    if (unassigned.length) {
-      lanes.push({ kind: 'unassigned', key: 'UNASSIGNED', label: '現場未定', members: unassigned });
+    var unassigned = deptStaff.filter(function (s) { return !s.todayGroupId; });
+    var unassignedPresent = sortByOrder(unassigned.filter(function (s) { return s.attendance === 'present'; }));
+    if (unassignedPresent.length) {
+      lanes.push({ kind: 'unassigned', key: 'UNASSIGNED', label: '現場未定', members: unassignedPresent });
     }
 
     if (department === 'unyu') {
@@ -815,8 +825,9 @@
       });
     }
 
-    if (absentStaff.length) {
-      lanes.push({ kind: 'absent', key: 'ABSENT', label: '休み', members: sortByOrder(absentStaff) });
+    var unassignedAbsent = sortByOrder(unassigned.filter(function (s) { return s.attendance === 'absent'; }));
+    if (unassignedAbsent.length) {
+      lanes.push({ kind: 'absent', key: 'ABSENT', label: '休み', members: unassignedAbsent });
     }
 
     return lanes;
