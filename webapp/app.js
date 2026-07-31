@@ -2170,7 +2170,7 @@
   // 運輸の場合、通常ダンプの組合せを優先して自動でペアにし、例外だけ
   // 確認画面でダンプを選び直せる。
   // ============================================================
-  var WIZARD_STEP_LABELS_UNYU = ['現場', '配置枠', 'ダンプ', '運転手', '確認'];
+  var WIZARD_STEP_LABELS_UNYU = ['現場', '配置枠', '運転手', '確認'];
   var WIZARD_STEP_LABELS_DOBOKU = ['現場', '配置枠', '作業員', '確認'];
 
   function wizardProgress(department, currentStep) {
@@ -2186,7 +2186,7 @@
   }
 
   function newGroupWizardState(department) {
-    return { department: department, siteId: null, groupId: null, vehicleIds: [], staffIds: [], pairs: [], extraStaffIds: [] };
+    return { department: department, siteId: null, groupId: null, vehicleIds: [], staffIds: [], pairs: [], extraStaffIds: [], autoVehicleFor: {} };
   }
 
   function openGroupWizard(department) {
@@ -2201,7 +2201,7 @@
       ws.siteId = site ? site.id : null;
       ws.groupId = groupId;
       if (!groupId) { buildWizardUndecidedStaffMulti(panel, close, ws); return; }
-      if (ws.department === 'unyu') buildWizardVehicleMulti(panel, close, ws);
+      if (ws.department === 'unyu') buildWizardDriverMultiUnyu(panel, close, ws);
       else buildWizardStaffMulti(panel, close, ws);
     }, close);
   }
@@ -2266,48 +2266,51 @@
     panel.appendChild(cancelBar(close));
   }
 
-  // ---- ステップ3(運輸のみ): ダンプ複数選択 ----
-  function buildWizardVehicleMulti(panel, close, ws) {
+  // ---- ステップ3(運輸): 運転手を選択。運転手とダンプは基本セットなので、
+  // 通常ダンプ(normalVehicleId)が空いていれば自動で一緒に選択する。
+  // 通常と違う車に乗せたい時・運転手なしでダンプだけ駐車したい時は、
+  // 次の確認画面でその都度タップして調整する。
+  function buildWizardDriverMultiUnyu(panel, close, ws) {
     panel.innerHTML = '';
-    panel.appendChild(wizardProgress('unyu', 3));
     var g = findGroup(ws.groupId);
-    panel.appendChild(modalHeader('ダンプを選択', g.displayLabel + 'へ配車するダンプをタップして選んでください(複数選択可)'));
-    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.vehicleIds.length + '台' }));
+    panel.appendChild(wizardProgress('unyu', 3));
+    panel.appendChild(modalHeader('運転手を選択', g.displayLabel + 'へ配置する運転手をタップして選んでください(複数選択可)。通常のダンプが空いていれば自動でセットになります。'));
+    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人 ／ ダンプ：' + ws.vehicleIds.length + '台' }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
-    var vehicles = sortByOrder(state.vehicles.filter(function (v) { return v.active !== false; }));
-    vehicles.forEach(function (v) {
-      var usable = v.status === 'available';
-      var selected = ws.vehicleIds.indexOf(v.id) !== -1;
-      var asn = usable ? findAssignmentForVehicle(v.id) : null;
-      var holder = asn ? findStaff(asn.staffId) : null;
-      var normalDriver = state.staff.find(function (s) { return s.active !== false && s.normalVehicleId === v.id; });
-      var lines = [
-        h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
-        h('span', { className: 'list-btn-text', text: v.displayName })
-      ];
-      if (!usable) lines.push(h('span', { className: 'status-badge status-' + v.status, text: VEHICLE_STATUS_LABELS[v.status] }));
-      if (usable && !selected && holder) {
-        var holderGroup = findGroup(asn.groupId);
-        lines.push(h('span', { className: 'list-btn-tag', text: holder.name + 'さん使用中(' + holderGroup.displayLabel + ')' }));
-      }
-      if (usable && !selected && !holder && v.todayGroupId && v.todayGroupId !== ws.groupId) {
-        var parkedGroup = findGroup(v.todayGroupId);
-        lines.push(h('span', { className: 'list-btn-tag', text: (parkedGroup ? parkedGroup.displayLabel : '') + 'に駐車中' }));
-      }
-      if (usable && normalDriver) lines.push(h('span', { className: 'list-btn-tag', text: '通常運転手:' + normalDriver.name }));
+    var candidates = sortByOrder(dumpDriverCandidates());
+    candidates.forEach(function (s) {
+      var selected = ws.staffIds.indexOf(s.id) !== -1;
+      var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
+      var normalVehicle = s.normalVehicleId ? findVehicle(s.normalVehicleId) : null;
       body.appendChild(h('button', {
-        className: 'list-btn vehicle-item select-item' + (selected ? ' is-selected' : '') + (usable ? '' : ' is-disabled'),
+        className: 'list-btn driver-item select-item' + (selected ? ' is-selected' : '') + (s.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
         attrs: { type: 'button' },
-        disabled: !usable,
-        onClick: function () { if (usable) toggleWizardVehicle(panel, close, ws, v); }
-      }, lines));
+        onClick: function () { toggleWizardDriver(panel, close, ws, s); }
+      }, [
+        h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
+        h('span', { className: 'list-btn-text', text: s.name }),
+        h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
+        h('span', { className: 'list-btn-tag', text: normalVehicle ? '通常：' + normalVehicle.displayName : '通常ダンプ設定なし' }),
+        (s.department !== 'unyu' && !selected) ? h('span', { className: 'list-btn-tag', text: DEPT_LABELS[s.department] }) : null,
+        (sGroup && !selected) ? h('span', { className: 'list-btn-tag', text: sGroup.displayLabel }) : null
+      ]));
     });
     panel.appendChild(body);
 
     var actionRow = h('div', { className: 'modal-footer two-col' });
-    actionRow.appendChild(h('button', { className: 'cancel-btn', text: '全選択解除', attrs: { type: 'button' }, onClick: function () { ws.vehicleIds = []; buildWizardVehicleMulti(panel, close, ws); } }));
-    actionRow.appendChild(h('button', { className: 'save-btn', text: '次へ', attrs: { type: 'button' }, onClick: function () { buildWizardStaffMulti(panel, close, ws); } }));
+    actionRow.appendChild(h('button', {
+      className: 'cancel-btn', text: '全選択解除', attrs: { type: 'button' },
+      onClick: function () { ws.staffIds = []; ws.vehicleIds = []; ws.autoVehicleFor = {}; buildWizardDriverMultiUnyu(panel, close, ws); }
+    }));
+    actionRow.appendChild(h('button', {
+      className: 'save-btn', text: '次へ', attrs: { type: 'button' },
+      onClick: function () {
+        if (!ws.staffIds.length) return;
+        computeAutoWizardPairs(ws);
+        buildWizardPairingConfirm(panel, close, ws);
+      }
+    }));
     panel.appendChild(actionRow);
 
     var footer = h('div', { className: 'modal-footer two-col' });
@@ -2316,42 +2319,69 @@
     panel.appendChild(footer);
   }
 
-  function toggleWizardVehicle(panel, close, ws, v) {
-    var idx = ws.vehicleIds.indexOf(v.id);
-    if (idx !== -1) { ws.vehicleIds.splice(idx, 1); buildWizardVehicleMulti(panel, close, ws); return; }
+  // 運転手を選択に追加する。通常ダンプが空いていれば自動で一緒に確保し、
+  // どの運転手のおかげで選ばれたダンプかをautoVehicleForに覚えておく
+  // (その運転手の選択を解除した時に、ダンプも一緒に外すため)。
+  function addWizardDriver(ws, s) {
+    ws.staffIds.push(s.id);
+    if (!s.normalVehicleId || ws.vehicleIds.indexOf(s.normalVehicleId) !== -1) return;
+    var v = findVehicle(s.normalVehicleId);
+    if (!v || v.active === false || v.status !== 'available') return;
     var asn = findAssignmentForVehicle(v.id);
     var currentGroupId = asn ? asn.groupId : v.todayGroupId;
-    if (currentGroupId && currentGroupId !== ws.groupId) {
-      var curGroup = findGroup(currentGroupId);
-      var who = asn ? findStaff(asn.staffId).name + 'さんが使用しています' : '駐車中です';
+    if (currentGroupId && currentGroupId !== ws.groupId) return;
+    ws.vehicleIds.push(v.id);
+    ws.autoVehicleFor[s.id] = v.id;
+  }
+
+  function toggleWizardDriver(panel, close, ws, s) {
+    var idx = ws.staffIds.indexOf(s.id);
+    if (idx !== -1) {
+      ws.staffIds.splice(idx, 1);
+      var autoVid = ws.autoVehicleFor[s.id];
+      if (autoVid) {
+        var vIdx = ws.vehicleIds.indexOf(autoVid);
+        if (vIdx !== -1) ws.vehicleIds.splice(vIdx, 1);
+        delete ws.autoVehicleFor[s.id];
+      }
+      buildWizardDriverMultiUnyu(panel, close, ws);
+      return;
+    }
+    if (isDriverAlreadyInOtherGroup(s, ws.groupId)) {
+      var curGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
+      var targetGroup = findGroup(ws.groupId);
+      var crossDept = curGroup && curGroup.department !== ws.department;
+      var message = crossDept
+        ? s.name + 'さんは現在、' + DEPT_LABELS[curGroup.department] + 'の' + curGroup.displayLabel + 'に配置されています。\n' +
+          DEPT_LABELS[ws.department] + 'の' + targetGroup.displayLabel + 'へ移動しますか？'
+        : s.name + 'さんは現在「' + (curGroup ? curGroup.displayLabel : '現場未定') + '」に登録されています。\n「' + targetGroup.displayLabel + '」へ移動しますか？';
       panel.innerHTML = '';
-      panel.appendChild(modalHeader('確認', v.displayName + 'は現在「' + curGroup.displayLabel + '」で' + who + '。\n「' + findGroup(ws.groupId).displayLabel + '」へ移動しますか？'));
+      panel.appendChild(modalHeader('確認', message));
       var body = h('div', { className: 'modal-body big-choice-list' });
       body.appendChild(h('button', {
         className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する',
-        onClick: function () { ws.vehicleIds.push(v.id); buildWizardVehicleMulti(panel, close, ws); }
+        onClick: function () { addWizardDriver(ws, s); buildWizardDriverMultiUnyu(panel, close, ws); }
       }));
       panel.appendChild(body);
       panel.appendChild(h('div', { className: 'modal-footer' }, [
-        h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardVehicleMulti(panel, close, ws); } })
+        h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardDriverMultiUnyu(panel, close, ws); } })
       ]));
       return;
     }
-    ws.vehicleIds.push(v.id);
-    buildWizardVehicleMulti(panel, close, ws);
+    addWizardDriver(ws, s);
+    buildWizardDriverMultiUnyu(panel, close, ws);
   }
 
-  // ---- ステップ(運輸=4/土木=3): 作業員・運転手の複数選択 ----
+  // ---- ステップ3(土木): 作業員の複数選択 ----
   function buildWizardStaffMulti(panel, close, ws) {
     panel.innerHTML = '';
     var g = findGroup(ws.groupId);
-    panel.appendChild(wizardProgress(ws.department, ws.department === 'unyu' ? 4 : 3));
-    panel.appendChild(modalHeader((ws.department === 'unyu' ? '運転手' : '作業員') + 'を選択', 'タップして選んでください(複数選択可)'));
-    var extra = ws.department === 'unyu' ? (' ／ 選択ダンプ：' + ws.vehicleIds.length + '台') : '';
-    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人' + extra }));
+    panel.appendChild(wizardProgress('doboku', 3));
+    panel.appendChild(modalHeader('作業員を選択', 'タップして選んでください(複数選択可)'));
+    panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人' }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
-    var pool = ws.department === 'unyu' ? dumpDriverCandidates() : state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; });
+    var pool = state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; });
     sortByOrder(pool).forEach(function (s) {
       var selected = ws.staffIds.indexOf(s.id) !== -1;
       var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
@@ -2363,7 +2393,6 @@
         h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
         h('span', { className: 'list-btn-text', text: s.name }),
         h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
-        (s.department !== ws.department && !selected) ? h('span', { className: 'list-btn-tag', text: DEPT_LABELS[s.department] }) : null,
         (sGroup && !selected) ? h('span', { className: 'list-btn-tag', text: sGroup.displayLabel }) : null
       ]));
     });
@@ -2373,19 +2402,12 @@
     actionRow.appendChild(h('button', { className: 'cancel-btn', text: '全選択解除', attrs: { type: 'button' }, onClick: function () { ws.staffIds = []; buildWizardStaffMulti(panel, close, ws); } }));
     actionRow.appendChild(h('button', {
       className: 'save-btn', text: '次へ', attrs: { type: 'button' },
-      onClick: function () {
-        if (!ws.staffIds.length) return;
-        if (ws.department === 'unyu') { computeAutoWizardPairs(ws); buildWizardPairingConfirm(panel, close, ws); }
-        else { buildWizardConfirmDoboku(panel, close, ws); }
-      }
+      onClick: function () { if (ws.staffIds.length) buildWizardConfirmDoboku(panel, close, ws); }
     }));
     panel.appendChild(actionRow);
 
     var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', {
-      className: 'cancel-btn', text: '戻る', attrs: { type: 'button' },
-      onClick: function () { if (ws.department === 'unyu') buildWizardVehicleMulti(panel, close, ws); else buildWizardStepSite(panel, close, ws); }
-    }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStepSite(panel, close, ws); } }));
     footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
     panel.appendChild(footer);
   }
@@ -2444,8 +2466,8 @@
   function buildWizardPairingConfirm(panel, close, ws) {
     panel.innerHTML = '';
     var g = findGroup(ws.groupId);
-    panel.appendChild(wizardProgress('unyu', 5));
-    panel.appendChild(modalHeader('配車内容を確認してください', g.displayLabel + 'へ追加する内容です。行をタップすると、その人のダンプを変更できます。'));
+    panel.appendChild(wizardProgress('unyu', 4));
+    panel.appendChild(modalHeader('配車内容を確認してください', g.displayLabel + 'へ追加する内容です。通常と違うダンプにする時だけ、行をタップして変更してください。'));
 
     var body = h('div', { className: 'modal-body scroll-list' });
     ws.pairs.forEach(function (p) {
@@ -2479,38 +2501,119 @@
     panel.appendChild(body);
 
     panel.appendChild(h('button', {
+      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '＋ 運転手なしのダンプを追加(駐車のみ)',
+      onClick: function () { buildWizardParkedVehiclePicker(panel, close, ws); }
+    }));
+    panel.appendChild(h('button', {
       className: 'choice-btn choice-add', attrs: { type: 'button' }, text: 'この内容で一括登録',
       onClick: function () { proceedToWizardAttendanceGate(panel, close, ws); }
     }));
 
     var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardStaffMulti(panel, close, ws); } }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardDriverMultiUnyu(panel, close, ws); } }));
     footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
     panel.appendChild(footer);
   }
 
-  // 対応確認画面から、その人のダンプを選び直す(このウィザードで
-  // 選んだダンプの範囲内で入れ替える)。
+  // 対応確認画面から、その人のダンプを選び直す。通常は運転手とダンプが
+  // セットなので自動選択のままでよく、これは例外(通常と違う車に乗せる)
+  // 時だけ使う。登録済みの全車両から、使用中/駐車中のものは確認の上で選べる。
   function buildWizardVehiclePickerForPair(panel, close, ws, staffId) {
     panel.innerHTML = '';
     var driver = findStaff(staffId);
-    panel.appendChild(modalHeader(driver.name + 'さんのダンプを選択', '選択中のダンプから選んでください'));
+    panel.appendChild(modalHeader(driver.name + 'さんのダンプを選択', '登録済みの車両からタップで選んでください'));
 
     var body = h('div', { className: 'modal-body scroll-list' });
     var currentPair = ws.pairs.filter(function (p) { return p.staffId === staffId; })[0];
     var currentVid = currentPair ? currentPair.vehicleId : null;
-    ws.vehicleIds.forEach(function (vid) {
-      var vehicle = findVehicle(vid);
-      var owner = ws.pairs.filter(function (p) { return p.staffId !== staffId && p.vehicleId === vid; })[0];
-      var selected = currentVid === vid;
+    var vehicles = sortByOrder(state.vehicles.filter(function (v) { return v.active !== false; }));
+    vehicles.forEach(function (v) {
+      var usable = v.status === 'available';
+      var selected = currentVid === v.id;
+      var owner = ws.pairs.filter(function (p) { return p.staffId !== staffId && p.vehicleId === v.id; })[0];
+      var asn = usable && !owner ? findAssignmentForVehicle(v.id) : null;
+      var parkedElsewhere = usable && !owner && !asn && v.todayGroupId && v.todayGroupId !== ws.groupId ? findGroup(v.todayGroupId) : null;
+      var lines = [h('span', { className: 'list-btn-text', text: v.displayName })];
+      if (!usable) lines.push(h('span', { className: 'status-badge status-' + v.status, text: VEHICLE_STATUS_LABELS[v.status] }));
+      if (owner) lines.push(h('span', { className: 'list-btn-tag', text: findStaff(owner.staffId).name + 'さんと交換' }));
+      if (asn) lines.push(h('span', { className: 'list-btn-tag', text: findStaff(asn.staffId).name + 'さん使用中(' + findGroup(asn.groupId).displayLabel + ')' }));
+      if (parkedElsewhere) lines.push(h('span', { className: 'list-btn-tag', text: parkedElsewhere.displayLabel + 'に駐車中' }));
+      if (selected) lines.push(h('span', { className: 'current-badge', text: '選択中' }));
       body.appendChild(h('button', {
-        className: 'list-btn vehicle-item' + (selected ? ' is-selected' : ''), attrs: { type: 'button' },
-        onClick: function () { reassignWizardPair(ws, staffId, vid); buildWizardPairingConfirm(panel, close, ws); }
-      }, [
-        h('span', { className: 'list-btn-text', text: vehicle.displayName }),
-        owner ? h('span', { className: 'list-btn-tag', text: findStaff(owner.staffId).name + 'さんと交換' }) : null,
-        selected ? h('span', { className: 'current-badge', text: '選択中' }) : null
-      ]));
+        className: 'list-btn vehicle-item' + (selected ? ' is-selected' : '') + (usable ? '' : ' is-disabled'),
+        attrs: { type: 'button' }, disabled: !usable,
+        onClick: function () {
+          if (!usable) return;
+          if (asn || parkedElsewhere) {
+            var who = asn ? findStaff(asn.staffId).name + 'さんが使用しています' : '駐車中です';
+            var curLabel = asn ? findGroup(asn.groupId).displayLabel : parkedElsewhere.displayLabel;
+            panel.innerHTML = '';
+            panel.appendChild(modalHeader('確認', v.displayName + 'は現在「' + curLabel + '」で' + who + '。\n' + driver.name + 'さんのダンプに変更しますか？'));
+            var cbody = h('div', { className: 'modal-body big-choice-list' });
+            cbody.appendChild(h('button', {
+              className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '変更する',
+              onClick: function () { reassignWizardPair(ws, staffId, v.id); buildWizardPairingConfirm(panel, close, ws); }
+            }));
+            panel.appendChild(cbody);
+            panel.appendChild(h('div', { className: 'modal-footer' }, [
+              h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardVehiclePickerForPair(panel, close, ws, staffId); } })
+            ]));
+            return;
+          }
+          reassignWizardPair(ws, staffId, v.id);
+          buildWizardPairingConfirm(panel, close, ws);
+        }
+      }, lines));
+    });
+    panel.appendChild(body);
+    panel.appendChild(h('div', { className: 'modal-footer' }, [
+      h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardPairingConfirm(panel, close, ws); } })
+    ]));
+  }
+
+  // 運転手を付けず、駐車のみのダンプを追加する(通常は不要。例外的に
+  // 空いている車を現場に置いておきたい時だけ使う)。
+  function buildWizardParkedVehiclePicker(panel, close, ws) {
+    panel.innerHTML = '';
+    panel.appendChild(modalHeader('駐車のみのダンプを追加', '運転手を付けずに駐車させる車両をタップしてください'));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+    var claimedIds = {};
+    ws.pairs.forEach(function (p) { claimedIds[p.vehicleId] = true; });
+    (ws.extraVehicleIds || []).forEach(function (vid) { claimedIds[vid] = true; });
+    var vehicles = sortByOrder(state.vehicles.filter(function (v) { return v.active !== false && !claimedIds[v.id]; }));
+    vehicles.forEach(function (v) {
+      var usable = v.status === 'available';
+      var asn = usable ? findAssignmentForVehicle(v.id) : null;
+      var parkedElsewhere = usable && !asn && v.todayGroupId && v.todayGroupId !== ws.groupId ? findGroup(v.todayGroupId) : null;
+      var lines = [h('span', { className: 'list-btn-text', text: v.displayName })];
+      if (!usable) lines.push(h('span', { className: 'status-badge status-' + v.status, text: VEHICLE_STATUS_LABELS[v.status] }));
+      if (asn) lines.push(h('span', { className: 'list-btn-tag', text: findStaff(asn.staffId).name + 'さん使用中(' + findGroup(asn.groupId).displayLabel + ')' }));
+      if (parkedElsewhere) lines.push(h('span', { className: 'list-btn-tag', text: parkedElsewhere.displayLabel + 'に駐車中' }));
+      body.appendChild(h('button', {
+        className: 'list-btn vehicle-item' + (usable ? '' : ' is-disabled'), attrs: { type: 'button' }, disabled: !usable,
+        onClick: function () {
+          if (!usable) return;
+          if (asn || parkedElsewhere) {
+            var who = asn ? findStaff(asn.staffId).name + 'さんが使用しています' : '駐車中です';
+            var curLabel = asn ? findGroup(asn.groupId).displayLabel : parkedElsewhere.displayLabel;
+            panel.innerHTML = '';
+            panel.appendChild(modalHeader('確認', v.displayName + 'は現在「' + curLabel + '」で' + who + '。\n運転手なしで駐車のみ追加しますか？'));
+            var cbody = h('div', { className: 'modal-body big-choice-list' });
+            cbody.appendChild(h('button', {
+              className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '追加する',
+              onClick: function () { (ws.extraVehicleIds = ws.extraVehicleIds || []).push(v.id); buildWizardPairingConfirm(panel, close, ws); }
+            }));
+            panel.appendChild(cbody);
+            panel.appendChild(h('div', { className: 'modal-footer' }, [
+              h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: function () { buildWizardParkedVehiclePicker(panel, close, ws); } })
+            ]));
+            return;
+          }
+          (ws.extraVehicleIds = ws.extraVehicleIds || []).push(v.id);
+          buildWizardPairingConfirm(panel, close, ws);
+        }
+      }, lines));
     });
     panel.appendChild(body);
     panel.appendChild(h('div', { className: 'modal-footer' }, [
@@ -2551,7 +2654,7 @@
   function buildWizardConfirmDoboku(panel, close, ws) {
     panel.innerHTML = '';
     var g = findGroup(ws.groupId);
-    panel.appendChild(wizardProgress('doboku', 3));
+    panel.appendChild(wizardProgress('doboku', 4));
     panel.appendChild(modalHeader('配置内容を確認してください', g.displayLabel + 'へ配置します'));
     var body = h('div', { className: 'modal-body scroll-list' });
     ws.staffIds.forEach(function (id) {
@@ -2627,8 +2730,8 @@
     body.appendChild(h('button', {
       className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '同じ配置枠に追加登録',
       onClick: function () {
-        ws.vehicleIds = []; ws.staffIds = []; ws.pairs = []; ws.extraStaffIds = []; ws.extraVehicleIds = [];
-        if (ws.department === 'unyu') buildWizardVehicleMulti(panel, close, ws);
+        ws.vehicleIds = []; ws.staffIds = []; ws.pairs = []; ws.extraStaffIds = []; ws.extraVehicleIds = []; ws.autoVehicleFor = {};
+        if (ws.department === 'unyu') buildWizardDriverMultiUnyu(panel, close, ws);
         else buildWizardStaffMulti(panel, close, ws);
       }
     }));
