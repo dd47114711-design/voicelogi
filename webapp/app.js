@@ -222,14 +222,22 @@
       });
     }
 
-    // 黒瀬とも美が居なければ、事務員として追加する(同姓同名がいる場合は追加しない)。
-    if (!loaded.staff.some(function (s) { return s.name === '黒瀬とも美'; })) {
+    // 初期データの事務員(黒瀬とも美・山内舞・江川愛梨・谷口扶美代)が
+    // 居なければ追加する(同姓同名が既にいる場合は追加しない)。
+    var officeSeedStaff = [
+      { id: 'staff_office_1', name: '黒瀬とも美', order: 1 },
+      { id: 'staff_office_2', name: '山内舞', order: 2 },
+      { id: 'staff_office_3', name: '江川愛梨', order: 3 },
+      { id: 'staff_office_4', name: '谷口扶美代', order: 4 }
+    ];
+    officeSeedStaff.forEach(function (seed) {
+      if (loaded.staff.some(function (s) { return s.name === seed.name; })) return;
       loaded.staff.push({
-        id: 'staff_office_1', name: '黒瀬とも美', department: 'office', workRoles: ['office'],
-        attendance: 'absent', normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 1, active: true
+        id: seed.id, name: seed.name, department: 'office', workRoles: ['office'],
+        attendance: 'absent', normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: seed.order, active: true
       });
       changed = true;
-    }
+    });
 
     return changed;
   }

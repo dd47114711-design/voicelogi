@@ -94,7 +94,13 @@
 
         // ---- 事務部門 ----
         { id: 'staff_office_1', name: '黒瀬とも美', department: 'office', workRoles: ['office'], attendance: 'absent',
-          normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 1, active: true }
+          normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 1, active: true },
+        { id: 'staff_office_2', name: '山内舞', department: 'office', workRoles: ['office'], attendance: 'absent',
+          normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 2, active: true },
+        { id: 'staff_office_3', name: '江川愛梨', department: 'office', workRoles: ['office'], attendance: 'absent',
+          normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 3, active: true },
+        { id: 'staff_office_4', name: '谷口扶美代', department: 'office', workRoles: ['office'], attendance: 'absent',
+          normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 4, active: true }
       ],
 
       // 現場マスタ: 会社名・現場名の基本情報だけを持つ。当日の配置枠
