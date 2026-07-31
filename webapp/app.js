@@ -55,6 +55,7 @@
     document.getElementById('btn-reset-data').addEventListener('click', function () { openResetDataConfirm(); });
     document.getElementById('btn-records').addEventListener('click', function () { openRecordsModal(); });
     document.getElementById('btn-staff-admin').addEventListener('click', function () { openStaffAdmin(); });
+    document.getElementById('btn-site-admin').addEventListener('click', function () { openSiteAdmin(); });
     document.getElementById('btn-name-toggle').addEventListener('click', function () {
       namesMasked = !namesMasked;
       document.getElementById('btn-name-toggle').textContent = namesMasked ? '氏名表示' : '氏名を黒塗り';
@@ -2155,7 +2156,10 @@
     panel.innerHTML = '';
     panel.appendChild(modalHeader('編集する現場を選択', '現場をタップしてください'));
     var body = h('div', { className: 'modal-body scroll-list' });
-    var sitesWithGroups = relevantSites(department).filter(function (site) { return groupsForSite(site.id, department, true).length > 0; });
+    // 使用停止にした現場でも、既に動いている配置枠は編集できるようにする
+    // (現場マスタの使用停止/使用可能は「新規作成」の候補一覧にのみ影響する)。
+    var candidateSites = state.sites.filter(function (site) { return site.category === department || site.category === 'common'; });
+    var sitesWithGroups = candidateSites.filter(function (site) { return groupsForSite(site.id, department, true).length > 0; });
     if (!sitesWithGroups.length) body.appendChild(h('p', { className: 'record-empty', text: '現在、配置されている現場はありません。' }));
     sitesWithGroups.forEach(function (site) {
       var groups = groupsForSite(site.id, department, true);
@@ -2189,6 +2193,162 @@
     });
     panel.appendChild(body);
     panel.appendChild(cancelBar(close));
+  }
+
+  // ============================================================
+  // 現場管理: 現場名(現場マスタ)は一度登録すれば消えることなく残り、
+  // 「現場を選択」の一覧に毎回出てくる。ここでは、その現場名自体の
+  // 修正と、不要になった現場を一覧から消す(使用停止/再度使用可能)
+  // 操作をまとめて行う。使用停止にしても、既に動いている配置枠自体は
+  // 終了するまで盤面に残る(現場マスタと当日の配置枠は別データ)。
+  // ============================================================
+  var SITE_ADMIN_FILTERS = [
+    { key: 'all', label: '全て' },
+    { key: 'doboku', label: '土木' },
+    { key: 'unyu', label: '運輸' },
+    { key: 'common', label: '共通' },
+    { key: 'inactive', label: '使用停止中' }
+  ];
+  var SITE_CATEGORY_ORDER = ['doboku', 'unyu', 'common'];
+  function siteCategoryLabel(category) { return category === 'common' ? '共通' : (DEPT_LABELS[category] || category); }
+
+  function openSiteAdmin() {
+    openModal(function (panel, close) {
+      buildSiteAdminContent(panel, close, 'all');
+    });
+  }
+
+  function buildSiteAdminContent(panel, close, filter) {
+    filter = filter || 'all';
+    panel.innerHTML = '';
+    var backHere = function () { buildSiteAdminContent(panel, close, filter); };
+    panel.appendChild(modalHeader('現場管理', '一度登録した現場名は消えずに残ります。区分をタップして絞り込み、現場をタップして編集してください'));
+    panel.appendChild(filterChipRow(SITE_ADMIN_FILTERS, filter, function (key) { buildSiteAdminContent(panel, close, key); }));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+
+    if (filter === 'inactive') {
+      var inactiveSites = sortByOrder(state.sites.filter(function (s) { return s.status !== 'active'; }));
+      if (!inactiveSites.length) body.appendChild(h('p', { className: 'record-empty', text: '使用停止中の現場はありません。' }));
+      inactiveSites.forEach(function (site) {
+        body.appendChild(h('button', {
+          className: 'list-btn site-item', attrs: { type: 'button' },
+          onClick: function () { buildSiteReactivateConfirm(panel, site.id, close, backHere); }
+        }, [
+          h('span', { className: 'list-btn-text', text: site.name }),
+          h('span', { className: 'list-btn-tag', text: siteCategoryLabel(site.category) })
+        ]));
+      });
+    } else {
+      var cats = filter === 'all' ? SITE_CATEGORY_ORDER : [filter];
+      var any = false;
+      cats.forEach(function (cat) {
+        var list = sortByOrder(state.sites.filter(function (s) { return s.category === cat && s.status === 'active'; }));
+        if (!list.length) return;
+        any = true;
+        if (filter === 'all') body.appendChild(h('div', { className: 'records-section-title', text: siteCategoryLabel(cat) + 'の現場' }));
+        list.forEach(function (site) {
+          body.appendChild(h('button', {
+            className: 'list-btn site-item', attrs: { type: 'button' },
+            onClick: function () { buildSiteEditMenu(panel, site.id, close, backHere); }
+          }, [
+            h('span', { className: 'list-btn-text', text: site.name })
+          ]));
+        });
+      });
+      if (!any) body.appendChild(h('p', { className: 'record-empty', text: '該当する現場がありません。' }));
+    }
+
+    panel.appendChild(body);
+    panel.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '＋ 新しい現場を追加',
+      onClick: function () {
+        buildNewSiteFormCore(panel, function () { buildSiteAdminContent(panel, close, 'all'); }, backHere);
+      }
+    }));
+    panel.appendChild(cancelBar(close));
+  }
+
+  function buildSiteEditMenu(panel, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    var backHere = function () { buildSiteEditMenu(panel, siteId, close, onBack); };
+    panel.appendChild(modalHeader(site.name + 'の編集', '変更する項目を選んでください'));
+    panel.appendChild(h('div', { className: 'current-line', text: '区分：' + siteCategoryLabel(site.category) }));
+
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '現場名を修正',
+      onClick: function () { buildSiteRenameForm(panel, siteId, close, backHere); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '使用停止にする(一覧から消す)',
+      onClick: function () { buildSiteDeactivateConfirm(panel, siteId, close, backHere); }
+    }));
+    panel.appendChild(body);
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
+  }
+
+  function buildSiteRenameForm(panel, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    panel.appendChild(modalHeader('現場名を修正', '新しい現場名を入力してください(既に配置枠が動いている現場では、動いている配置枠の表示名は変わりません)'));
+    var body = h('div', { className: 'modal-body' });
+    var errorMsg = h('p', { className: 'form-error hidden' });
+    var input = h('input', { className: 'form-input', attrs: { type: 'text', inputmode: 'text', autocomplete: 'off' } });
+    input.value = site.name;
+    body.appendChild(h('label', { className: 'form-label', text: '現場名' }));
+    body.appendChild(input);
+    body.appendChild(errorMsg);
+    panel.appendChild(body);
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+    footer.appendChild(h('button', {
+      className: 'save-btn', text: '保存', attrs: { type: 'button' },
+      onClick: function () {
+        var trimmed = input.value.trim();
+        if (!trimmed) { errorMsg.textContent = '現場名を入力してください。'; errorMsg.classList.remove('hidden'); return; }
+        var dup = state.sites.some(function (s) { return s.id !== siteId && s.name === trimmed; });
+        if (dup) { errorMsg.textContent = '同じ名前の現場が既に登録されています。'; errorMsg.classList.remove('hidden'); return; }
+        site.name = trimmed;
+        persist(); renderAll();
+        onBack();
+      }
+    }));
+    panel.appendChild(footer);
+    input.focus();
+  }
+
+  function buildSiteDeactivateConfirm(panel, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    var activeGroupCount = state.dispatchGroups.filter(function (g) { return g.siteId === siteId && g.active !== false; }).length;
+    var subtitle = '「現場を選択」の一覧に出てこなくなります(いつでも「使用停止中」から戻せます)。';
+    if (activeGroupCount) subtitle += '\n※ 現在この現場を使った配置枠が' + activeGroupCount + '件動いていますが、そちらは終了するまでそのまま盤面に残ります。';
+    panel.appendChild(modalHeader(site.name + 'を使用停止にしますか？', subtitle));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '使用停止にする',
+      onClick: function () { site.status = 'inactive'; persist(); renderAll(); showToast(site.name, '使用停止にしました'); close(); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(onBack));
+  }
+
+  function buildSiteReactivateConfirm(panel, siteId, close, onBack) {
+    panel.innerHTML = '';
+    var site = findSite(siteId);
+    panel.appendChild(modalHeader(site.name + 'を再度使用可能にしますか？', '「現場を選択」の一覧に再び表示されます。'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '使用可能にする',
+      onClick: function () { site.status = 'active'; persist(); renderAll(); showToast(site.name, '使用可能に戻しました'); close(); }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(onBack));
   }
 
   // ============================================================
