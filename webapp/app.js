@@ -1285,15 +1285,18 @@
     });
   }
 
+  // 従業員本人が自分の名前札をタップした時の画面。出勤・退勤の切替
+  // だけを行い、配置枠の変更などの管理操作はここには置かない
+  // (現場の組み替えは、現場名札(中央の札)からの配置枠編集メニューで
+  // 黒瀬大祐さん(土木)・会長(運輸)など管理側が行う)。
   function buildDobokuMenuContent(panel, staffId, close) {
     panel.innerHTML = '';
     var s = findStaff(staffId);
     var g = s.todayGroupId ? findGroup(s.todayGroupId) : null;
-    var backHere = function () { buildDobokuMenuContent(panel, staffId, close); };
-    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤・配置枠の変更を選択してください'));
+    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
     panel.appendChild(h('div', {
       className: 'current-line',
-      text: '現在の配置：' + (g ? g.displayLabel : '現場未定') + (s.attendance === 'absent' ? '(休み)' : '')
+      text: '現在の配置：' + (g ? g.displayLabel : '現場未定')
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
@@ -1316,76 +1319,15 @@
       s.attendance === 'absent' ? h('span', { className: 'current-badge', text: '現在' }) : null
     ]));
 
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '配置枠を変更',
-      onClick: function () {
-        buildSitePickerForGroup(panel, 'doboku', close, function (groupId) {
-          moveStaffToGroupWithConfirm(panel, close, backHere, s, groupId, 'doboku');
-        }, backHere);
-      }
-    }));
-
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '休みへ移動',
-      onClick: function () { handleAttendanceChoice(panel, staffId, close, 'absent'); }
-    }));
-
     panel.appendChild(body);
     panel.appendChild(cancelBar(close));
   }
 
-  // groupId(null可)へ人を移す。既に別の配置枠にいた場合、部門が
-  // 異なる移動(例: 土木→運輸)なら専用の確認文言を出す。
-  function moveStaffToGroupWithConfirm(panel, close, backHere, staff, groupId, targetDepartment) {
-    var currentGroup = staff.todayGroupId ? findGroup(staff.todayGroupId) : null;
-    if (currentGroup && currentGroup.id !== groupId) {
-      var targetLabel = groupId ? findGroup(groupId).displayLabel : '現場未定';
-      var crossDept = currentGroup.department !== targetDepartment;
-      var message = crossDept
-        ? s_name(staff) + 'さんは現在、' + DEPT_LABELS[currentGroup.department] + 'の' + currentGroup.displayLabel + 'に配置されています。\n' +
-          DEPT_LABELS[targetDepartment] + 'の' + targetLabel + 'へ移動しますか？'
-        : s_name(staff) + 'さんは現在「' + currentGroup.displayLabel + '」に登録されています。\n「' + targetLabel + '」へ移動しますか？';
-      panel.innerHTML = '';
-      panel.appendChild(modalHeader('確認', message));
-      var body = h('div', { className: 'modal-body big-choice-list' });
-      body.appendChild(h('button', {
-        className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する',
-        onClick: function () { commitStaffMove(staff, groupId); close(); }
-      }));
-      panel.appendChild(body);
-      panel.appendChild(h('div', { className: 'modal-footer' }, [
-        h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: backHere })
-      ]));
-      return;
-    }
-    commitStaffMove(staff, groupId);
-    close();
-  }
-
-  function s_name(staff) { return staff.name; }
-
-  // 移動先が運輸で、移動元に組合せダンプがあれば、そのダンプごと
-  // 引き継ぐ(空いていれば)。本人の基本所属departmentは変更しない。
-  // 通常ダンプ設定も勝手に変更しない。
-  function commitStaffMove(staff, groupId) {
-    var oldAsn = findAssignmentForStaff(staff.id);
-    var carryVehicleId = null;
-    var targetDept = groupId ? findGroup(groupId).department : staff.department;
-    if (oldAsn && targetDept === 'unyu') carryVehicleId = oldAsn.vehicleId;
-    if (groupId) {
-      assignStaffToGroup(staff.id, groupId, carryVehicleId);
-    } else {
-      removeStaffFromGroup(staff);
-    }
-    if (staff.attendance !== 'present') applyAttendanceChange(staff, 'present', new Date());
-    persist();
-    if (groupId) setLaneOpen(targetDept, groupId, true);
-    renderAll();
-    showToast(staff.name, (groupId ? findGroup(groupId).displayLabel : '現場未定') + 'へ移動しました');
-  }
-
   // ============================================================
-  // 運輸: 配車編集メニュー(名前・ダンプ札をタップした時に表示)
+  // 運輸: 従業員本人が自分の名前・ダンプ札をタップした時の画面。
+  // 土木側と同じく、出勤・退勤の切替だけを行う(配置枠やダンプの
+  // 組合せの変更は、現場名札(中央の札)からの配置枠編集メニューで
+  // 会長など管理側が行う)。
   // ============================================================
   function openDispatchEditMenu(staffId) {
     openModal(function (panel, close) {
@@ -1399,52 +1341,15 @@
     var g = s.todayGroupId ? findGroup(s.todayGroupId) : null;
     var asn = findAssignmentForStaff(staffId);
     var vehicle = asn ? findVehicle(asn.vehicleId) : null;
-    var backHere = function () { buildDispatchEditMenuContent(panel, staffId, close); };
 
-    panel.appendChild(modalHeader(s.name + ' さんの配車', '変更する項目を選んでください'));
+    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
     panel.appendChild(h('div', {
       className: 'current-line',
-      text: '配置枠：' + (g ? g.displayLabel : '現場未定') + ' ／ ダンプ：' + (vehicle ? vehicle.displayName : '未割当') +
-        (s.attendance === 'absent' ? ' ／ 休み' : ' ／ 出勤中')
+      text: '配置枠：' + (g ? g.displayLabel : '現場未定') + ' ／ ダンプ：' + (vehicle ? vehicle.displayName : '未割当')
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
 
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '配置枠を変更',
-      onClick: function () {
-        buildSitePickerForGroup(panel, 'unyu', close, function (groupId) {
-          moveStaffToGroupWithConfirm(panel, close, backHere, s, groupId, 'unyu');
-        }, backHere);
-      }
-    }));
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: vehicle ? 'ダンプを変更' : 'ダンプを選択',
-      onClick: function () { buildVehiclePickerForStaff(panel, staffId, close, backHere); }
-    }));
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '運転手を変更',
-      onClick: function () { buildDriverReplaceContent(panel, staffId, close, backHere); }
-    }));
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-neutral', attrs: { type: 'button' }, text: '出勤／退勤を変更',
-      onClick: function () { buildAttendanceSubMenuContent(panel, staffId, close, backHere); }
-    }));
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '配車を解除',
-      onClick: function () { buildUnassignConfirmContent(panel, staffId, close, backHere); }
-    }));
-
-    panel.appendChild(body);
-    panel.appendChild(cancelBar(close));
-  }
-
-  function buildAttendanceSubMenuContent(panel, staffId, close, onBack) {
-    panel.innerHTML = '';
-    var s = findStaff(staffId);
-    panel.appendChild(modalHeader(s.name + ' さんの出退勤', '出勤・退勤を選択してください'));
-
-    var body = h('div', { className: 'modal-body big-choice-list' });
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
       attrs: { type: 'button' },
@@ -1461,15 +1366,13 @@
       h('span', { className: 'choice-text', text: '退勤' }),
       s.attendance === 'absent' ? h('span', { className: 'current-badge', text: '現在' }) : null
     ]));
-    panel.appendChild(body);
 
-    var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
-    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
-    panel.appendChild(footer);
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(close));
   }
 
   // ある運転手のダンプを、登録されている全てのダンプから選び直す。
+  // 配置枠編集メニュー(現場名札からの「組合せを変更」)専用。
   // その人が今どの配置枠にいるかは変えず、ダンプの組合せだけ変える。
   function buildVehiclePickerForStaff(panel, staffId, close, onBack) {
     panel.innerHTML = '';
@@ -1521,107 +1424,6 @@
     footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
     footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
     panel.appendChild(footer);
-  }
-
-  // 「運転手を変更」: 今の配車(配置枠・ダンプ)を別の人に引き継がせる。
-  // 元の人は未配置(現場未定)へ戻す。
-  function buildDriverReplaceContent(panel, staffId, close, onBack) {
-    panel.innerHTML = '';
-    var s = findStaff(staffId);
-    var asn = findAssignmentForStaff(staffId);
-    var vehicle = asn ? findVehicle(asn.vehicleId) : null;
-    panel.appendChild(modalHeader('運転手を変更', (vehicle ? vehicle.displayName : 'この配車') + 'を担当する人をタップしてください'));
-
-    var body = h('div', { className: 'modal-body scroll-list' });
-    var candidates = sortByOrder(dumpDriverCandidates().filter(function (c) { return c.id !== staffId; }));
-    candidates.forEach(function (c) {
-      var cGroup = c.todayGroupId ? findGroup(c.todayGroupId) : null;
-      body.appendChild(h('button', {
-        className: 'list-btn driver-item' + (c.attendance === 'present' ? ' is-present-driver' : ' is-absent-driver'),
-        attrs: { type: 'button' },
-        onClick: function () {
-          if (isDriverAlreadyInOtherGroup(c, s.todayGroupId)) {
-            buildDriverReplaceConfirm(panel, staffId, close, onBack, c);
-          } else {
-            performDriverSwap(s, c);
-            close();
-          }
-        }
-      }, [
-        h('span', { className: 'list-btn-text', text: c.name }),
-        h('span', { className: 'status-badge ' + (c.attendance === 'present' ? 'status-available' : 'status-suspended'), text: c.attendance === 'present' ? '出勤' : '退勤' }),
-        c.department !== 'unyu' ? h('span', { className: 'list-btn-tag', text: DEPT_LABELS[c.department] }) : null,
-        cGroup ? h('span', { className: 'list-btn-tag', text: cGroup.displayLabel }) : null
-      ]));
-    });
-    panel.appendChild(body);
-
-    var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
-    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
-    panel.appendChild(footer);
-  }
-
-  function buildDriverReplaceConfirm(panel, staffId, close, onBack, candidate) {
-    panel.innerHTML = '';
-    var s = findStaff(staffId);
-    var candidateGroup = candidate.todayGroupId ? findGroup(candidate.todayGroupId) : null;
-    var targetGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
-    panel.appendChild(modalHeader('確認',
-      candidate.name + 'さんは現在「' + (candidateGroup ? candidateGroup.displayLabel : '現場未定') + '」に登録されています。\n' +
-      '「' + (targetGroup ? targetGroup.displayLabel : '現場未定') + '」へ移動しますか？'));
-    var body = h('div', { className: 'modal-body big-choice-list' });
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '移動する',
-      onClick: function () { performDriverSwap(s, candidate); close(); }
-    }));
-    panel.appendChild(body);
-    panel.appendChild(h('div', { className: 'modal-footer' }, [
-      h('button', {
-        className: 'cancel-btn', text: '戻る', attrs: { type: 'button' },
-        onClick: function () { buildDriverReplaceContent(panel, staffId, close, onBack); }
-      })
-    ]));
-  }
-
-  function performDriverSwap(oldStaff, newStaff) {
-    var groupId = oldStaff.todayGroupId;
-    var asn = findAssignmentForStaff(oldStaff.id);
-    var vehicleId = asn ? asn.vehicleId : null;
-
-    removeStaffFromGroup(oldStaff);
-    if (groupId) assignStaffToGroup(newStaff.id, groupId, vehicleId);
-    if (newStaff.attendance !== 'present') applyAttendanceChange(newStaff, 'present', new Date());
-
-    persist();
-    if (groupId) setLaneOpen('unyu', groupId, true);
-    renderAll();
-    showToast(newStaff.name, (groupId ? findGroup(groupId).displayLabel : '現場未定') + 'の運転手を変更しました');
-  }
-
-  function buildUnassignConfirmContent(panel, staffId, close, onBack) {
-    panel.innerHTML = '';
-    var s = findStaff(staffId);
-    panel.appendChild(modalHeader('配車を解除しますか？', s.name + 'さんの配置枠・ダンプの割当を解除します(出退勤の記録や人員・車両の登録自体は削除しません)。'));
-    var body = h('div', { className: 'modal-body big-choice-list' });
-    body.appendChild(h('button', {
-      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '解除する',
-      onClick: function () { unassignDispatch(staffId); close(); }
-    }));
-    panel.appendChild(body);
-    var footer = h('div', { className: 'modal-footer two-col' });
-    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
-    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
-    panel.appendChild(footer);
-  }
-
-  function unassignDispatch(staffId) {
-    var s = findStaff(staffId);
-    if (!s) return;
-    removeStaffFromGroup(s);
-    persist();
-    renderAll();
-    showToast(s.name, '配車を解除しました');
   }
 
   // ============================================================
