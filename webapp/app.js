@@ -1154,14 +1154,18 @@
   // 0.5時間刻みでタップして選んでもらう。直前に記録した退勤ログに
   // 時間を書き足すだけで、出退勤の記録自体は変更しない。
   // ============================================================
-  var OVERTIME_HOUR_OPTIONS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+  var OVERTIME_HOUR_OPTIONS = (function () {
+    var opts = [];
+    for (var i = 0; i <= 20; i++) opts.push(i * 0.5);
+    return opts;
+  })();
 
   function buildOvertimeChoiceContent(panel, staffId, close) {
     panel.innerHTML = '';
     var s = findStaff(staffId);
     panel.appendChild(modalHeader(s.name + ' さんの残業申告', '今日の残業時間をタップして選んでください(0.5時間単位)'));
 
-    var body = h('div', { className: 'modal-body overtime-grid' });
+    var body = h('div', { className: 'modal-body overtime-grid scroll-list' });
     OVERTIME_HOUR_OPTIONS.forEach(function (hrs) {
       body.appendChild(h('button', {
         className: 'overtime-btn' + (hrs === 0 ? ' overtime-btn-zero' : ''),
