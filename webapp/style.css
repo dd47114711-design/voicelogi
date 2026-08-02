@@ -525,6 +525,29 @@ button:disabled { cursor: default; }
 .choice-move { background: #eaf1fb; border-color: #1f6fb2; color: #175a94; }
 .choice-btn.is-current { box-shadow: 0 0 0 4px rgba(31,111,178,0.35) inset; }
 
+/* ---------------- 残業の自己申告(0.5時間刻みのタップ選択) ---------------- */
+.overtime-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+}
+.overtime-btn {
+  min-height: 90px;
+  border-radius: 14px;
+  border: 2px solid #1f6fb2;
+  background: #eaf1fb;
+  color: #175a94;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.overtime-btn:active { background: #d7e6f8; }
+.overtime-btn-zero {
+  border-color: #999;
+  background: #f4f4f4;
+  color: #555;
+}
+.overtime-btn-zero:active { background: #e8e8e8; }
+
 /* ---------------- 配車登録ウィザードの進捗表示 ---------------- */
 .wizard-progress {
   display: flex;
@@ -728,11 +751,12 @@ button:disabled { cursor: default; }
   font-size: 0.95rem;
   border-bottom: 2px solid #ccc;
 }
-.record-col-name { flex: 1 1 26%; font-weight: 700; }
-.record-col-dept { flex: 0 0 16%; color: #666; }
-.record-col-time { flex: 0 0 18%; text-align: center; }
-.record-col-dur { flex: 0 0 22%; text-align: center; font-weight: 700; }
+.record-col-name { flex: 1 1 22%; font-weight: 700; }
+.record-col-dept { flex: 0 0 14%; color: #666; }
+.record-col-time { flex: 0 0 16%; text-align: center; }
+.record-col-dur { flex: 0 0 18%; text-align: center; font-weight: 700; }
 .record-col-dur.is-warning { color: #c0392b; }
+.record-col-ot { flex: 0 0 14%; text-align: center; font-weight: 700; color: #175a94; }
 
 .history-row {
   display: flex;
@@ -748,6 +772,15 @@ button:disabled { cursor: default; }
 .history-action { flex: 0 0 18%; text-align: center; font-weight: 700; padding: 0.15rem 0; border-radius: 8px; }
 .history-action-clockIn { color: #1e8449; background: #eafaf1; }
 .history-action-clockOut { color: #922b21; background: #fdecea; }
+.history-overtime {
+  flex: 0 0 auto;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #175a94;
+  background: #eaf1fb;
+  padding: 0.15rem 0.6rem;
+  border-radius: 8px;
+}
 
 /* ---------------- 記録完了トースト ---------------- */
 .toast {

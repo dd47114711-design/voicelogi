@@ -1124,7 +1124,8 @@
       buildAttendanceConfirmContent(panel, staffId, close, status);
     } else {
       setAttendance(staffId, status);
-      close();
+      if (status === 'absent') buildOvertimeChoiceContent(panel, staffId, close);
+      else close();
     }
   }
 
@@ -1138,10 +1139,48 @@
       className: 'choice-btn choice-add',
       attrs: { type: 'button' },
       text: '記録する',
-      onClick: function () { setAttendance(staffId, status); close(); }
+      onClick: function () {
+        setAttendance(staffId, status);
+        if (status === 'absent') buildOvertimeChoiceContent(panel, staffId, close);
+        else close();
+      }
     }));
     panel.appendChild(body);
     panel.appendChild(cancelBar(close));
+  }
+
+  // ============================================================
+  // 残業の自己申告: 退勤を記録した直後に、その日の残業時間を
+  // 0.5時間刻みでタップして選んでもらう。直前に記録した退勤ログに
+  // 時間を書き足すだけで、出退勤の記録自体は変更しない。
+  // ============================================================
+  var OVERTIME_HOUR_OPTIONS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
+  function buildOvertimeChoiceContent(panel, staffId, close) {
+    panel.innerHTML = '';
+    var s = findStaff(staffId);
+    panel.appendChild(modalHeader(s.name + ' さんの残業申告', '今日の残業時間をタップして選んでください(0.5時間単位)'));
+
+    var body = h('div', { className: 'modal-body overtime-grid' });
+    OVERTIME_HOUR_OPTIONS.forEach(function (hrs) {
+      body.appendChild(h('button', {
+        className: 'overtime-btn' + (hrs === 0 ? ' overtime-btn-zero' : ''),
+        attrs: { type: 'button' },
+        text: hrs === 0 ? '残業なし' : hrs + '時間',
+        onClick: function () { recordOvertime(s, hrs); close(); }
+      }));
+    });
+    panel.appendChild(body);
+    panel.appendChild(h('div', { className: 'modal-footer' }, [
+      h('button', { className: 'cancel-btn', text: '申告しない', attrs: { type: 'button' }, onClick: close })
+    ]));
+  }
+
+  function recordOvertime(staff, hours) {
+    var lastClockOut = state.attendanceLogs.filter(function (r) { return r.personId === staff.id && r.action === 'clockOut'; }).slice(-1)[0];
+    if (lastClockOut) lastClockOut.overtimeHours = hours;
+    persist();
+    showToast(staff.name, hours > 0 ? '残業' + hours + '時間を記録しました' : '残業なしを記録しました');
   }
 
   // 新規現場フォームの本体部分。保存・戻る時の動作は呼び出し元が
@@ -3154,7 +3193,7 @@
   // ============================================================
   // 出退勤記録: イベントログの集計とCSV出力(日次・月次)
   // ============================================================
-  var CSV_HEADERS = ['日付', '所属', '氏名', '出勤時刻', '退勤時刻', '勤務時間'];
+  var CSV_HEADERS = ['日付', '所属', '氏名', '出勤時刻', '退勤時刻', '勤務時間', '残業'];
   var DEPT_ORDER_BY_LABEL = { '土木': 1, '運輸': 2, '事務': 3, '共通': 4 };
   function deptRank(label) { return DEPT_ORDER_BY_LABEL[label] || 9; }
 
@@ -3177,6 +3216,7 @@
       department: last.department,
       clockInIso: ins.length ? ins[0].timestamp : null,
       clockOutIso: outs.length ? outs[outs.length - 1].timestamp : null,
+      overtimeHours: outs.length ? (outs[outs.length - 1].overtimeHours || 0) : 0,
       _order: staff ? (staff.order || 0) : 999
     };
   }
@@ -3225,14 +3265,15 @@
       var endMs = new Date(row.clockOutIso).getTime();
       duration = endMs < startMs ? '要確認' : formatDurationHM(row.clockInIso, row.clockOutIso);
     }
-    return { clockInStr: clockInStr, clockOutStr: clockOutStr, duration: duration };
+    var overtimeStr = row.overtimeHours ? row.overtimeHours + '時間' : '';
+    return { clockInStr: clockInStr, clockOutStr: clockOutStr, duration: duration, overtimeStr: overtimeStr };
   }
 
   function buildCsv(rows) {
     var lines = [CSV_HEADERS.map(csvEscape).join(',')];
     rows.forEach(function (row) {
       var sum = summarizeRow(row);
-      lines.push([row.date, row.department, row.personName, sum.clockInStr, sum.clockOutStr, sum.duration].map(csvEscape).join(','));
+      lines.push([row.date, row.department, row.personName, sum.clockInStr, sum.clockOutStr, sum.duration, sum.overtimeStr].map(csvEscape).join(','));
     });
     return '﻿' + lines.join('\r\n');
   }
@@ -3323,7 +3364,8 @@
           body.appendChild(h('div', { className: 'history-row' }, [
             h('span', { className: 'history-time', text: formatTimeHM(e.timestamp) }),
             h('span', { className: 'history-name', text: e.personName }),
-            h('span', { className: 'history-action history-action-' + e.action, text: e.action === 'clockIn' ? '出勤' : '退勤' })
+            h('span', { className: 'history-action history-action-' + e.action, text: e.action === 'clockIn' ? '出勤' : '退勤' }),
+            (e.action === 'clockOut' && e.overtimeHours) ? h('span', { className: 'history-overtime', text: '残業' + e.overtimeHours + '時間' }) : null
           ]));
         });
       }
@@ -3337,7 +3379,8 @@
           h('span', { className: 'record-col record-col-dept', text: '所属' }),
           h('span', { className: 'record-col record-col-time', text: '出勤' }),
           h('span', { className: 'record-col record-col-time', text: '退勤' }),
-          h('span', { className: 'record-col record-col-dur', text: '勤務時間' })
+          h('span', { className: 'record-col record-col-dur', text: '勤務時間' }),
+          h('span', { className: 'record-col record-col-ot', text: '残業' })
         ]));
         summaryRows.forEach(function (row) {
           var sum = summarizeRow(row);
@@ -3346,7 +3389,8 @@
             h('span', { className: 'record-col record-col-dept', text: row.department }),
             h('span', { className: 'record-col record-col-time', text: sum.clockInStr }),
             h('span', { className: 'record-col record-col-time', text: sum.clockOutStr }),
-            h('span', { className: 'record-col record-col-dur' + (sum.duration === '要確認' ? ' is-warning' : ''), text: sum.duration })
+            h('span', { className: 'record-col record-col-dur' + (sum.duration === '要確認' ? ' is-warning' : ''), text: sum.duration }),
+            h('span', { className: 'record-col record-col-ot', text: sum.overtimeStr })
           ]));
         });
       }
