@@ -2338,10 +2338,41 @@
   }
 
   // 予定の追加・修正フォーム。タイトルとメモ以外はすべてタップで選ぶ。
+  var CALENDAR_WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+  // 月表示のカレンダー(7列×日数分)を組み立てる。日付をタップすると
+  // すぐにその日が選ばれる(前日/翌日を何度も押して数か月先まで
+  // 進める必要が無いようにするため)。
+  function buildCalendarGrid(viewYear, viewMonth, selectedDate, todayDate, onPickDay) {
+    var grid = h('div', { className: 'sched-calendar-grid' });
+    CALENDAR_WEEKDAY_LABELS.forEach(function (label) {
+      grid.appendChild(h('div', { className: 'sched-calendar-weekday', text: label }));
+    });
+    var firstDow = new Date(viewYear, viewMonth - 1, 1).getDay();
+    var daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+    for (var i = 0; i < firstDow; i++) grid.appendChild(h('div', { className: 'sched-calendar-day is-blank' }));
+    var selYMD = formatYMD(selectedDate);
+    var todayYMDStr = formatYMD(todayDate);
+    for (var day = 1; day <= daysInMonth; day++) {
+      var cellDate = new Date(viewYear, viewMonth - 1, day);
+      var cellYMD = formatYMD(cellDate);
+      var isSelected = cellYMD === selYMD;
+      var isToday = cellYMD === todayYMDStr;
+      grid.appendChild(h('button', {
+        className: 'sched-calendar-day' + (isSelected ? ' is-selected' : '') + (isToday ? ' is-today' : ''),
+        attrs: { type: 'button' }, text: String(day),
+        onClick: function (d) { return function () { onPickDay(d); }; }(cellDate)
+      }));
+    }
+    return grid;
+  }
+
   function buildScheduleEventForm(panel, close, onBack, existingEvent) {
     var typeSel = { value: existingEvent ? existingEvent.type : 'training' };
     var selectedStaffIds = existingEvent ? existingEvent.staffIds.slice() : [];
     var eventDate = existingEvent ? parseYMD(existingEvent.date) : new Date();
+    var calYear = eventDate.getFullYear();
+    var calMonth = eventDate.getMonth() + 1;
     // タイトル・メモは自由入力なので、タップ操作で再描画するたびに
     // 消えないよう、現在の入力値をここに保持してから再描画する。
     var titleValue = existingEvent ? existingEvent.title : '';
@@ -2352,6 +2383,13 @@
       if (titleInput) titleValue = titleInput.value;
       if (noteInput) noteValue = noteInput.value;
       render();
+    }
+
+    function shiftCalendarMonth(delta) {
+      var total = calYear * 12 + (calMonth - 1) + delta;
+      calYear = Math.floor(total / 12);
+      calMonth = (total % 12) + 1;
+      rerender();
     }
 
     function render() {
@@ -2377,12 +2415,18 @@
       errorMsg = h('p', { className: 'form-error hidden' });
       body.appendChild(errorMsg);
 
-      body.appendChild(h('label', { className: 'form-label', text: '日付' }));
+      body.appendChild(h('label', { className: 'form-label', text: '日付：' + formatDateJP(eventDate) }));
       body.appendChild(h('div', { className: 'date-nav-row' }, [
-        h('button', { className: 'date-nav-btn', text: '◀ 前日', attrs: { type: 'button' }, onClick: function () { eventDate = shiftDate(eventDate, -1); rerender(); } }),
-        h('div', { className: 'date-display', text: formatDateJP(eventDate) }),
-        h('button', { className: 'date-nav-btn', text: '翌日 ▶', attrs: { type: 'button' }, onClick: function () { eventDate = shiftDate(eventDate, 1); rerender(); } })
+        h('button', { className: 'date-nav-btn', text: '◀ 前月', attrs: { type: 'button' }, onClick: function () { shiftCalendarMonth(-1); } }),
+        h('div', { className: 'date-display', text: calYear + '年' + calMonth + '月' }),
+        h('button', { className: 'date-nav-btn', text: '翌月 ▶', attrs: { type: 'button' }, onClick: function () { shiftCalendarMonth(1); } })
       ]));
+      body.appendChild(buildCalendarGrid(calYear, calMonth, eventDate, new Date(), function (pickedDate) {
+        eventDate = pickedDate;
+        calYear = pickedDate.getFullYear();
+        calMonth = pickedDate.getMonth() + 1;
+        rerender();
+      }));
 
       body.appendChild(h('label', { className: 'form-label', text: '対象者(複数選択可)' }));
       body.appendChild(h('div', { className: 'current-line', text: '選択中：' + selectedStaffIds.length + '人' }));

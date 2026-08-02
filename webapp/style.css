@@ -932,6 +932,34 @@ button:disabled { cursor: default; }
 .schedule-type-meeting { background: #8e44ad; }
 .schedule-type-other { background: #5d6470; }
 
+/* 予定の日付選択(月表示カレンダー)。3か月先などに設定する時、
+   前日/翌日を何度も押さずに、日付を直接タップして選べるようにする。 */
+.sched-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.9rem;
+}
+.sched-calendar-weekday {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #888;
+  padding: 0.2rem 0;
+}
+.sched-calendar-day {
+  min-height: 64px;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+  background: #fafafa;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #333;
+}
+.sched-calendar-day.is-blank { visibility: hidden; border: none; background: none; min-height: 64px; }
+.sched-calendar-day.is-today { border-color: #1f6fb2; color: #175a94; }
+.sched-calendar-day.is-selected { background: #1f6fb2; border-color: #1f6fb2; color: #fff; }
+
 /* ---------------- 従業員管理 ---------------- */
 .staff-admin-item .list-btn-tag { margin-right: 0.3rem; }
 .reorder-row { display: flex; align-items: center; gap: 0.5rem; }
