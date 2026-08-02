@@ -348,6 +348,7 @@ button:disabled { cursor: default; }
 
 /* 出勤(表)=白、退勤(裏)=赤。所属は上部の帯色で見分ける。 */
 .tag-name {
+  position: relative;
   border-top: 10px solid #97a3ad;
 }
 .tag-name.dept-doboku { border-top-color: #d35400; }
@@ -356,10 +357,15 @@ button:disabled { cursor: default; }
 .tag-name.is-absent { background: #b6362a; color: #fff8f6; }
 .tag-name.is-absent .tag-name-text { color: #fff8f6; }
 
-/* 氏名黒塗りモード: 名前の文字は描画せず、札全体を黒い長方形にする
-   (透けたり一部だけ見えたりしないよう、文字ノード自体を出力しない)。 */
-.tag-name.is-masked { background: #12141a; border-color: #000; }
-.tag-name.is-masked .tag-name-text { background: #000; min-height: 168px; }
+/* 名前札の右上に付く、講習・会議など今後の予定バッジ */
+.tag-event-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 1.1rem;
+  line-height: 1;
+  writing-mode: horizontal-tb;
+}
 
 .tag-info {
   min-width: 108px;
@@ -523,6 +529,7 @@ button:disabled { cursor: default; }
 .choice-neutral { background: #f4f4f4; color: #444; }
 .choice-add { background: #eaf6ee; border-color: #27ae60; color: #1e8449; margin-top: 0.2rem; }
 .choice-move { background: #eaf1fb; border-color: #1f6fb2; color: #175a94; }
+.choice-event { background: #fff6e0; border-color: #d4a017; color: #8a6300; font-size: 1.35rem; }
 .choice-btn.is-current { box-shadow: 0 0 0 4px rgba(31,111,178,0.35) inset; }
 
 /* ---------------- 残業の自己申告(0.5時間刻みのタップ選択) ---------------- */
@@ -897,6 +904,16 @@ button:disabled { cursor: default; }
   color: #555;
 }
 .filter-chip.is-active { background: #1f6fb2; border-color: #1f6fb2; color: #fff; }
+
+/* ---------------- スケジュール管理(講習・会議・休みなどの予定) ---------------- */
+.schedule-item { flex-wrap: wrap; height: auto; min-height: 78px; gap: 0.5rem 0.7rem; justify-content: flex-start; }
+.schedule-item.is-past { opacity: 0.55; }
+.schedule-date-tag { font-variant-numeric: tabular-nums; }
+.schedule-type-badge { margin-right: 0; }
+.schedule-type-training { background: #1f6fb2; }
+.schedule-type-off { background: #c0392b; }
+.schedule-type-meeting { background: #8e44ad; }
+.schedule-type-other { background: #5d6470; }
 
 /* ---------------- 従業員管理 ---------------- */
 .staff-admin-item .list-btn-tag { margin-right: 0.3rem; }

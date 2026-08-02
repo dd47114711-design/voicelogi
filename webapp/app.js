@@ -22,7 +22,6 @@
   'use strict';
 
   var state = null;
-  var namesMasked = false;
   var activeDepartment = 'unyu';
   var DEPARTMENT_TABS = ['doboku', 'unyu', 'office', 'summary'];
 
@@ -56,11 +55,7 @@
     document.getElementById('btn-records').addEventListener('click', function () { openRecordsModal(); });
     document.getElementById('btn-staff-admin').addEventListener('click', function () { openStaffAdmin(); });
     document.getElementById('btn-site-admin').addEventListener('click', function () { openSiteAdmin(); });
-    document.getElementById('btn-name-toggle').addEventListener('click', function () {
-      namesMasked = !namesMasked;
-      document.getElementById('btn-name-toggle').textContent = namesMasked ? '氏名表示' : '氏名を黒塗り';
-      renderAll();
-    });
+    document.getElementById('btn-schedule-admin').addEventListener('click', function () { openScheduleAdmin(); });
     document.getElementById('btn-dispatch-register').addEventListener('click', function () { openGroupWizard('unyu'); });
     document.getElementById('btn-unyu-site-edit').addEventListener('click', function () { openExistingSiteEditPicker('unyu'); });
     document.getElementById('btn-unyu-vehicle-status').addEventListener('click', function () { openVehicleAdmin(); });
@@ -155,6 +150,7 @@
 
     if (!loaded.dispatchGroups) { loaded.dispatchGroups = []; changed = true; }
     if (!loaded.assignments) { loaded.assignments = []; changed = true; }
+    if (!loaded.scheduleEvents) { loaded.scheduleEvents = []; changed = true; }
 
     loaded.staff.forEach(function (s) {
       if (!s.workRoles) {
@@ -277,6 +273,11 @@
 
   function formatYMD(d) {
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function parseYMD(str) {
+    var parts = str.split('-').map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
   }
 
   function formatTimeHM(iso) {
@@ -949,19 +950,22 @@
   }
 
   // ---- 個々の札(タグ) ----
-  // 運転手(作業員)の名前札。出勤=白、退勤=赤。氏名黒塗りモードの
-  // 時は、文字を一切描画せず札全体を黒くする(透けを防ぐ)。
+  // 運転手(作業員)の名前札。出勤=白、退勤=赤。本人・今後の予定
+  // (講習・会議など)があれば📅バッジを付けて、タップ前から分かるようにする。
   function driverTag(s) {
     var dept = effectiveDisplayDept(s);
     var deptClass = dept === 'unyu' ? 'dept-unyu' : 'dept-doboku';
     return h('button', {
-      className: 'tag tag-name ' + deptClass + ' ' + (s.attendance === 'present' ? 'is-present' : 'is-absent') + (namesMasked ? ' is-masked' : ''),
+      className: 'tag tag-name ' + deptClass + ' ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
       attrs: { type: 'button' },
       onClick: function () {
         if (dept === 'unyu') openDispatchEditMenu(s.id);
         else openDobokuMenu(s.id);
       }
-    }, [h('span', { className: 'tag-name-text', html: namesMasked ? '' : verticalHtml(s.name) })]);
+    }, [
+      h('span', { className: 'tag-name-text', html: verticalHtml(s.name) }),
+      eventsForStaff(s.id).length ? h('span', { className: 'tag-event-badge', text: '📅' }) : null
+    ]);
   }
 
   // ダンプ(車両)札。現場グループの右側に並ぶ。
@@ -1011,10 +1015,13 @@
   // ============================================================
   function officeTag(s) {
     return h('button', {
-      className: 'tag tag-name dept-office ' + (s.attendance === 'present' ? 'is-present' : 'is-absent') + (namesMasked ? ' is-masked' : ''),
+      className: 'tag tag-name dept-office ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
       attrs: { type: 'button' },
       onClick: function () { openOfficeMenu(s.id); }
-    }, [h('span', { className: 'tag-name-text', html: namesMasked ? '' : verticalHtml(s.name) })]);
+    }, [
+      h('span', { className: 'tag-name-text', html: verticalHtml(s.name) }),
+      eventsForStaff(s.id).length ? h('span', { className: 'tag-event-badge', text: '📅' }) : null
+    ]);
   }
 
   function renderOffice() {
@@ -1035,11 +1042,26 @@
     });
   }
 
+  // その人に今日以降の予定(講習・会議など)があれば、出退勤ボタンの
+  // 前に「📅 予定あり」ボタンを添える。無ければ何も返さない。
+  function eventNoticeButton(panel, staffId, close, backHere) {
+    var events = eventsForStaff(staffId);
+    if (!events.length) return null;
+    var label = events.length === 1 ? events[0].date + ' ' + SCHEDULE_TYPE_LABELS[events[0].type] : events.length + '件';
+    return h('button', {
+      className: 'choice-btn choice-event', attrs: { type: 'button' }, text: '📅 予定あり(' + label + ')',
+      onClick: function () { buildScheduleEventViewer(panel, staffId, close, backHere); }
+    });
+  }
+
   function buildOfficeMenuContent(panel, staffId, close) {
     panel.innerHTML = '';
     var s = findStaff(staffId);
+    var backHere = function () { buildOfficeMenuContent(panel, staffId, close); };
     panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
     var body = h('div', { className: 'modal-body big-choice-list' });
+    var eventBtn = eventNoticeButton(panel, staffId, close, backHere);
+    if (eventBtn) body.appendChild(eventBtn);
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
       attrs: { type: 'button' },
@@ -1336,6 +1358,7 @@
     panel.innerHTML = '';
     var s = findStaff(staffId);
     var g = s.todayGroupId ? findGroup(s.todayGroupId) : null;
+    var backHere = function () { buildDobokuMenuContent(panel, staffId, close); };
     panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
     panel.appendChild(h('div', {
       className: 'current-line',
@@ -1343,6 +1366,8 @@
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
+    var eventBtn = eventNoticeButton(panel, staffId, close, backHere);
+    if (eventBtn) body.appendChild(eventBtn);
 
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
@@ -1384,6 +1409,7 @@
     var g = s.todayGroupId ? findGroup(s.todayGroupId) : null;
     var asn = findAssignmentForStaff(staffId);
     var vehicle = asn ? findVehicle(asn.vehicleId) : null;
+    var backHere = function () { buildDispatchEditMenuContent(panel, staffId, close); };
 
     panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
     panel.appendChild(h('div', {
@@ -1392,6 +1418,8 @@
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
+    var eventBtn = eventNoticeButton(panel, staffId, close, backHere);
+    if (eventBtn) body.appendChild(eventBtn);
 
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
@@ -2205,6 +2233,229 @@
     }));
     panel.appendChild(body);
     panel.appendChild(cancelBar(onBack));
+  }
+
+  // ============================================================
+  // スケジュール管理: 講習・会議・休みなどの予定は事務員がここで登録・
+  // 修正・削除する。従業員本人は、自分の出退勤メニューに現れる
+  // 「📅 予定あり」ボタンをタップして内容を確認するだけ(修正はできない)。
+  // ============================================================
+  var SCHEDULE_TYPE_LABELS = { training: '講習', off: '休み', meeting: '会議', other: 'その他' };
+  var SCHEDULE_TYPE_ORDER = ['training', 'off', 'meeting', 'other'];
+
+  function todayYMD() { return formatYMD(new Date()); }
+
+  // 本人の当日以降の予定を日付順に返す(出退勤メニューのバッジ・
+  // ボタン表示用)。
+  function eventsForStaff(staffId) {
+    var today = todayYMD();
+    return state.scheduleEvents
+      .filter(function (e) { return e.staffIds.indexOf(staffId) !== -1 && e.date >= today; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  }
+
+  function allScheduleEventsSorted() {
+    return state.scheduleEvents.slice().sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  }
+
+  function scheduleEventStaffNames(ev) {
+    return ev.staffIds.map(function (id) { var s = findStaff(id); return s ? s.name : null; }).filter(Boolean).join('、');
+  }
+
+  function openScheduleAdmin() {
+    openModal(function (panel, close) {
+      buildScheduleAdminContent(panel, close);
+    });
+  }
+
+  function buildScheduleAdminContent(panel, close) {
+    panel.innerHTML = '';
+    var backHere = function () { buildScheduleAdminContent(panel, close); };
+    panel.appendChild(modalHeader('スケジュール管理', '講習・会議・休みなどの予定を登録してください。対象者の出退勤メニューに「予定あり」として表示されます'));
+
+    var body = h('div', { className: 'modal-body scroll-list' });
+    var events = allScheduleEventsSorted();
+    var today = todayYMD();
+    if (!events.length) body.appendChild(h('p', { className: 'record-empty', text: '登録されている予定はありません。' }));
+    events.forEach(function (ev) {
+      body.appendChild(h('button', {
+        className: 'list-btn schedule-item' + (ev.date < today ? ' is-past' : ''), attrs: { type: 'button' },
+        onClick: function () { buildScheduleEventEditMenu(panel, ev.id, close, backHere); }
+      }, [
+        h('span', { className: 'list-btn-tag schedule-date-tag', text: ev.date }),
+        h('span', { className: 'status-badge schedule-type-badge schedule-type-' + ev.type, text: SCHEDULE_TYPE_LABELS[ev.type] }),
+        h('span', { className: 'list-btn-text', text: ev.title + '(' + scheduleEventStaffNames(ev) + ')' })
+      ]));
+    });
+    panel.appendChild(body);
+
+    panel.appendChild(h('button', {
+      className: 'choice-btn choice-add', attrs: { type: 'button' }, text: '＋ 新しい予定を追加',
+      onClick: function () { buildScheduleEventForm(panel, close, backHere, null); }
+    }));
+    panel.appendChild(cancelBar(close));
+  }
+
+  function buildScheduleEventEditMenu(panel, eventId, close, onBack) {
+    panel.innerHTML = '';
+    var ev = state.scheduleEvents.filter(function (e) { return e.id === eventId; })[0];
+    var subtitle = ev.date + ' ／ ' + SCHEDULE_TYPE_LABELS[ev.type] + ' ／ 対象：' + scheduleEventStaffNames(ev) + (ev.note ? '\n' + ev.note : '');
+    panel.appendChild(modalHeader(ev.title, subtitle));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '内容を修正',
+      onClick: function () { buildScheduleEventForm(panel, close, onBack, ev); }
+    }));
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '削除する',
+      onClick: function () { buildScheduleDeleteConfirm(panel, eventId, close, onBack); }
+    }));
+    panel.appendChild(body);
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
+  }
+
+  function buildScheduleDeleteConfirm(panel, eventId, close, onBack) {
+    panel.innerHTML = '';
+    var ev = state.scheduleEvents.filter(function (e) { return e.id === eventId; })[0];
+    panel.appendChild(modalHeader('この予定を削除しますか？', ev.title + '(' + ev.date + ')'));
+    var body = h('div', { className: 'modal-body big-choice-list' });
+    body.appendChild(h('button', {
+      className: 'choice-btn choice-absent', attrs: { type: 'button' }, text: '削除する',
+      onClick: function () {
+        var idx = state.scheduleEvents.indexOf(ev);
+        if (idx !== -1) state.scheduleEvents.splice(idx, 1);
+        persist(); renderAll();
+        showToast(ev.title, '予定を削除しました');
+        close();
+      }
+    }));
+    panel.appendChild(body);
+    panel.appendChild(cancelBar(onBack));
+  }
+
+  // 予定の追加・修正フォーム。タイトルとメモ以外はすべてタップで選ぶ。
+  function buildScheduleEventForm(panel, close, onBack, existingEvent) {
+    var typeSel = { value: existingEvent ? existingEvent.type : 'training' };
+    var selectedStaffIds = existingEvent ? existingEvent.staffIds.slice() : [];
+    var eventDate = existingEvent ? parseYMD(existingEvent.date) : new Date();
+    // タイトル・メモは自由入力なので、タップ操作で再描画するたびに
+    // 消えないよう、現在の入力値をここに保持してから再描画する。
+    var titleValue = existingEvent ? existingEvent.title : '';
+    var noteValue = existingEvent ? (existingEvent.note || '') : '';
+    var titleInput, noteInput, errorMsg;
+
+    function rerender() {
+      if (titleInput) titleValue = titleInput.value;
+      if (noteInput) noteValue = noteInput.value;
+      render();
+    }
+
+    function render() {
+      panel.innerHTML = '';
+      panel.appendChild(modalHeader(existingEvent ? '予定を修正' : '新しい予定を追加', 'タイトル・メモ以外はタップで選べます'));
+      var body = h('div', { className: 'modal-body scroll-list' });
+
+      body.appendChild(h('label', { className: 'form-label', text: '種別' }));
+      var typeRow = h('div', { className: 'category-row' });
+      SCHEDULE_TYPE_ORDER.forEach(function (key) {
+        typeRow.appendChild(h('button', {
+          className: 'category-btn' + (typeSel.value === key ? ' is-selected' : ''),
+          attrs: { type: 'button' }, text: SCHEDULE_TYPE_LABELS[key],
+          onClick: function () { typeSel.value = key; rerender(); }
+        }));
+      });
+      body.appendChild(typeRow);
+
+      body.appendChild(h('label', { className: 'form-label', text: 'タイトル' }));
+      titleInput = h('input', { className: 'form-input', attrs: { type: 'text', inputmode: 'text', autocomplete: 'off', placeholder: '例：安全講習' } });
+      titleInput.value = titleValue;
+      body.appendChild(titleInput);
+      errorMsg = h('p', { className: 'form-error hidden' });
+      body.appendChild(errorMsg);
+
+      body.appendChild(h('label', { className: 'form-label', text: '日付' }));
+      body.appendChild(h('div', { className: 'date-nav-row' }, [
+        h('button', { className: 'date-nav-btn', text: '◀ 前日', attrs: { type: 'button' }, onClick: function () { eventDate = shiftDate(eventDate, -1); rerender(); } }),
+        h('div', { className: 'date-display', text: formatDateJP(eventDate) }),
+        h('button', { className: 'date-nav-btn', text: '翌日 ▶', attrs: { type: 'button' }, onClick: function () { eventDate = shiftDate(eventDate, 1); rerender(); } })
+      ]));
+
+      body.appendChild(h('label', { className: 'form-label', text: '対象者(複数選択可)' }));
+      body.appendChild(h('div', { className: 'current-line', text: '選択中：' + selectedStaffIds.length + '人' }));
+      sortByOrder(state.staff.filter(function (s) { return s.active !== false; })).forEach(function (s) {
+        var selected = selectedStaffIds.indexOf(s.id) !== -1;
+        body.appendChild(h('button', {
+          className: 'list-btn select-item' + (selected ? ' is-selected' : ''), attrs: { type: 'button' },
+          onClick: function () {
+            var idx = selectedStaffIds.indexOf(s.id);
+            if (idx !== -1) selectedStaffIds.splice(idx, 1); else selectedStaffIds.push(s.id);
+            rerender();
+          }
+        }, [
+          h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
+          h('span', { className: 'list-btn-text', text: s.name }),
+          h('span', { className: 'list-btn-tag', text: DEPT_LABELS[s.department] })
+        ]));
+      });
+
+      body.appendChild(h('label', { className: 'form-label', text: 'メモ(任意)' }));
+      noteInput = h('input', { className: 'form-input', attrs: { type: 'text', inputmode: 'text', autocomplete: 'off', placeholder: '例：13時〜 本社会議室' } });
+      noteInput.value = noteValue;
+      body.appendChild(noteInput);
+
+      panel.appendChild(body);
+      var footer = h('div', { className: 'modal-footer two-col' });
+      footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+      footer.appendChild(h('button', {
+        className: 'save-btn', text: '保存', attrs: { type: 'button' },
+        onClick: function () {
+          var trimmedTitle = titleInput.value.trim();
+          if (!trimmedTitle) { errorMsg.textContent = 'タイトルを入力してください。'; errorMsg.classList.remove('hidden'); return; }
+          if (!selectedStaffIds.length) { errorMsg.textContent = '対象者を1人以上選んでください。'; errorMsg.classList.remove('hidden'); return; }
+          if (existingEvent) {
+            existingEvent.type = typeSel.value;
+            existingEvent.title = trimmedTitle;
+            existingEvent.date = formatYMD(eventDate);
+            existingEvent.staffIds = selectedStaffIds.slice();
+            existingEvent.note = noteInput.value.trim();
+          } else {
+            state.scheduleEvents.push({
+              id: genId('sched'), type: typeSel.value, title: trimmedTitle, date: formatYMD(eventDate),
+              staffIds: selectedStaffIds.slice(), note: noteInput.value.trim(), createdAt: new Date().toISOString()
+            });
+          }
+          persist(); renderAll();
+          showToast(trimmedTitle, existingEvent ? '予定を修正しました' : '予定を追加しました');
+          onBack();
+        }
+      }));
+      panel.appendChild(footer);
+    }
+    render();
+  }
+
+  // 従業員本人向け: 予定の内容を確認するだけの読み取り専用画面。
+  function buildScheduleEventViewer(panel, staffId, close, onBack) {
+    panel.innerHTML = '';
+    var s = findStaff(staffId);
+    var events = eventsForStaff(staffId);
+    panel.appendChild(modalHeader(s.name + ' さんの予定', '内容を確認できます(変更は事務員が行います)'));
+    var body = h('div', { className: 'modal-body scroll-list' });
+    events.forEach(function (ev) {
+      body.appendChild(h('div', { className: 'list-btn schedule-item' }, [
+        h('span', { className: 'list-btn-tag schedule-date-tag', text: ev.date }),
+        h('span', { className: 'status-badge schedule-type-badge schedule-type-' + ev.type, text: SCHEDULE_TYPE_LABELS[ev.type] }),
+        h('span', { className: 'list-btn-text', text: ev.title + (ev.note ? '(' + ev.note + ')' : '') })
+      ]));
+    });
+    panel.appendChild(body);
+    var footer = h('div', { className: 'modal-footer two-col' });
+    footer.appendChild(h('button', { className: 'cancel-btn', text: '戻る', attrs: { type: 'button' }, onClick: onBack }));
+    footer.appendChild(h('button', { className: 'cancel-btn', text: 'キャンセル', attrs: { type: 'button' }, onClick: close }));
+    panel.appendChild(footer);
   }
 
   // ============================================================

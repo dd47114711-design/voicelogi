@@ -144,6 +144,11 @@
       // 出退勤の打刻記録(日次・月次CSV出力の元データ)
       attendanceLogs: [],
 
+      // スケジュール(講習・会議・休みなど)。事務員がスケジュール管理
+      // 画面から登録し、対象者の出退勤メニューに「予定あり」として表示する。
+      // { id, type, title, note, date, staffIds, createdAt }
+      scheduleEvents: [],
+
       updatedAt: null
     };
   }
