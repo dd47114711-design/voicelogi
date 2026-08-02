@@ -427,6 +427,24 @@ button:disabled { cursor: default; }
 .modal-header { flex: 0 0 auto; margin-bottom: 0.7rem; }
 .modal-title { font-size: 1.95rem; margin: 0 0 0.3rem; color: #1b2733; }
 .modal-subtitle { font-size: 1.1rem; color: #707070; margin: 0; white-space: pre-line; }
+
+/* タイトル行の右上に、出勤/退勤などの主要ボタンとは離して小さく
+   添えるバッジ(例: 予定あり)。 */
+.modal-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.modal-header-main { flex: 1 1 auto; min-width: 0; }
+.event-notice-badge {
+  flex: 0 0 auto;
+  min-height: 56px;
+  padding: 0 1.1rem;
+  border-radius: 30px;
+  border: 2px solid #d4a017;
+  background: #fff6e0;
+  color: #8a6300;
+  font-size: 1.15rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.event-notice-badge:active { background: #ffedb8; }
 .current-line { font-size: 1.2rem; font-weight: 700; color: #29486a; margin: 0 0 0.7rem; }
 
 .modal-body {
@@ -529,7 +547,6 @@ button:disabled { cursor: default; }
 .choice-neutral { background: #f4f4f4; color: #444; }
 .choice-add { background: #eaf6ee; border-color: #27ae60; color: #1e8449; margin-top: 0.2rem; }
 .choice-move { background: #eaf1fb; border-color: #1f6fb2; color: #175a94; }
-.choice-event { background: #fff6e0; border-color: #d4a017; color: #8a6300; font-size: 1.35rem; }
 .choice-btn.is-current { box-shadow: 0 0 0 4px rgba(31,111,178,0.35) inset; }
 
 /* ---------------- 残業の自己申告(0.5時間刻みのタップ選択) ---------------- */

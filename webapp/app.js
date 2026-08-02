@@ -1049,7 +1049,7 @@
     if (!events.length) return null;
     var label = events.length === 1 ? events[0].date + ' ' + SCHEDULE_TYPE_LABELS[events[0].type] : events.length + '件';
     return h('button', {
-      className: 'choice-btn choice-event', attrs: { type: 'button' }, text: '📅 予定あり(' + label + ')',
+      className: 'event-notice-badge', attrs: { type: 'button' }, text: '📅 予定あり(' + label + ')',
       onClick: function () { buildScheduleEventViewer(panel, staffId, close, backHere); }
     });
   }
@@ -1058,10 +1058,8 @@
     panel.innerHTML = '';
     var s = findStaff(staffId);
     var backHere = function () { buildOfficeMenuContent(panel, staffId, close); };
-    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
+    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください', eventNoticeButton(panel, staffId, close, backHere)));
     var body = h('div', { className: 'modal-body big-choice-list' });
-    var eventBtn = eventNoticeButton(panel, staffId, close, backHere);
-    if (eventBtn) body.appendChild(eventBtn);
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
       attrs: { type: 'button' },
@@ -1110,10 +1108,17 @@
     root.innerHTML = '';
   }
 
-  function modalHeader(title, subtitle) {
-    var children = [h('h2', { className: 'modal-title', text: title })];
-    if (subtitle) children.push(h('p', { className: 'modal-subtitle', text: subtitle }));
-    return h('div', { className: 'modal-header' }, children);
+  // corner(省略可): タイトルと同じ行の右上に小さく添える要素
+  // (例: 予定ありバッジ)。出勤・退勤などの主要ボタンとは離して置きたい
+  // 時に使う。
+  function modalHeader(title, subtitle, corner) {
+    var titleBlock = [h('h2', { className: 'modal-title', text: title })];
+    if (subtitle) titleBlock.push(h('p', { className: 'modal-subtitle', text: subtitle }));
+    if (!corner) return h('div', { className: 'modal-header' }, titleBlock);
+    return h('div', { className: 'modal-header modal-header-row' }, [
+      h('div', { className: 'modal-header-main' }, titleBlock),
+      corner
+    ]);
   }
 
   function cancelBar(close) {
@@ -1359,15 +1364,13 @@
     var s = findStaff(staffId);
     var g = s.todayGroupId ? findGroup(s.todayGroupId) : null;
     var backHere = function () { buildDobokuMenuContent(panel, staffId, close); };
-    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
+    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください', eventNoticeButton(panel, staffId, close, backHere)));
     panel.appendChild(h('div', {
       className: 'current-line',
       text: '現在の配置：' + (g ? g.displayLabel : '現場未定')
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
-    var eventBtn = eventNoticeButton(panel, staffId, close, backHere);
-    if (eventBtn) body.appendChild(eventBtn);
 
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
@@ -1411,15 +1414,13 @@
     var vehicle = asn ? findVehicle(asn.vehicleId) : null;
     var backHere = function () { buildDispatchEditMenuContent(panel, staffId, close); };
 
-    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください'));
+    panel.appendChild(modalHeader(s.name + ' さん', '出勤・退勤を選択してください', eventNoticeButton(panel, staffId, close, backHere)));
     panel.appendChild(h('div', {
       className: 'current-line',
       text: '配置枠：' + (g ? g.displayLabel : '現場未定') + ' ／ ダンプ：' + (vehicle ? vehicle.displayName : '未割当')
     }));
 
     var body = h('div', { className: 'modal-body big-choice-list' });
-    var eventBtn = eventNoticeButton(panel, staffId, close, backHere);
-    if (eventBtn) body.appendChild(eventBtn);
 
     body.appendChild(h('button', {
       className: 'choice-btn choice-present' + (s.attendance === 'present' ? ' is-current' : ''),
