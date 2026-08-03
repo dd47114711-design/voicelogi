@@ -457,6 +457,68 @@
     return siteFuriganaSortKey(a).localeCompare(siteFuriganaSortKey(b), 'ja');
   }
 
+  // ============================================================
+  // あかさたな行見出し: 現場が多い一覧(現場を選択・現場管理)で
+  // スクロールの目印になるよう、フリガナの先頭文字から
+  // あ/か/さ/た/な/は/ま/や/ら/わ行を判定してグループ化する。
+  // ============================================================
+  var GOJUON_ROWS = ['あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', '他'];
+  var KANA_ROW_TABLE = {
+    'ア': 'あ', 'イ': 'あ', 'ウ': 'あ', 'エ': 'あ', 'オ': 'あ', 'ァ': 'あ', 'ィ': 'あ', 'ゥ': 'あ', 'ェ': 'あ', 'ォ': 'あ',
+    'カ': 'か', 'キ': 'か', 'ク': 'か', 'ケ': 'か', 'コ': 'か', 'ガ': 'か', 'ギ': 'か', 'グ': 'か', 'ゲ': 'か', 'ゴ': 'か',
+    'サ': 'さ', 'シ': 'さ', 'ス': 'さ', 'セ': 'さ', 'ソ': 'さ', 'ザ': 'さ', 'ジ': 'さ', 'ズ': 'さ', 'ゼ': 'さ', 'ゾ': 'さ',
+    'タ': 'た', 'チ': 'た', 'ツ': 'た', 'テ': 'た', 'ト': 'た', 'ダ': 'た', 'ヂ': 'た', 'ヅ': 'た', 'デ': 'た', 'ド': 'た', 'ッ': 'た',
+    'ナ': 'な', 'ニ': 'な', 'ヌ': 'な', 'ネ': 'な', 'ノ': 'な',
+    'ハ': 'は', 'ヒ': 'は', 'フ': 'は', 'ヘ': 'は', 'ホ': 'は', 'バ': 'は', 'ビ': 'は', 'ブ': 'は', 'ベ': 'は', 'ボ': 'は', 'パ': 'は', 'ピ': 'は', 'プ': 'は', 'ペ': 'は', 'ポ': 'は',
+    'マ': 'ま', 'ミ': 'ま', 'ム': 'ま', 'メ': 'ま', 'モ': 'ま',
+    'ヤ': 'や', 'ユ': 'や', 'ヨ': 'や', 'ャ': 'や', 'ュ': 'や', 'ョ': 'や',
+    'ラ': 'ら', 'リ': 'ら', 'ル': 'ら', 'レ': 'ら', 'ロ': 'ら',
+    'ワ': 'わ', 'ヲ': 'わ', 'ン': 'わ'
+  };
+  // ひらがなで登録された場合もカタカナに正規化してから判定する
+  function toKatakanaChar(ch) {
+    var code = ch.charCodeAt(0);
+    return (code >= 0x3041 && code <= 0x3096) ? String.fromCharCode(code + 0x60) : ch;
+  }
+  function furiganaRowLabel(furigana) {
+    var trimmed = (furigana || '').trim();
+    if (!trimmed) return '他';
+    return KANA_ROW_TABLE[toKatakanaChar(trimmed.charAt(0))] || '他';
+  }
+  var GOJUON_ROW_KATAKANA_LABEL = { 'あ': 'ア行', 'か': 'カ行', 'さ': 'サ行', 'た': 'タ行', 'な': 'ナ行', 'は': 'ハ行', 'ま': 'マ行', 'や': 'ヤ行', 'ら': 'ラ行', 'わ': 'ワ行', '他': '他' };
+  // 一覧中に実際に存在する行だけを「全て」＋ア行・カ行…の絞り込み
+  // チップとして返す(該当行が1つしか無い場合はチップ自体を出さない)。
+  function gojuonRowFilterOptions(sites) {
+    var present = {};
+    sites.forEach(function (site) { present[furiganaRowLabel(site.furigana || site.name)] = true; });
+    var options = [{ key: 'all', label: '全て' }];
+    GOJUON_ROWS.forEach(function (row) {
+      if (present[row]) options.push({ key: row, label: GOJUON_ROW_KATAKANA_LABEL[row] });
+    });
+    return options.length > 2 ? options : [];
+  }
+  // フリガナ順(compareSiteFurigana)で既に並んでいる現場一覧を、
+  // あ/か/さ...行ごとの塊に分けて返す({ label, sites }の配列。
+  // 該当が無い行は含めない)。「全て」表示時のインライン見出し用。
+  function groupSitesByFuriganaRow(sites) {
+    var buckets = {};
+    GOJUON_ROWS.forEach(function (row) { buckets[row] = []; });
+    sites.forEach(function (site) {
+      buckets[furiganaRowLabel(site.furigana || site.name)].push(site);
+    });
+    var groups = [];
+    GOJUON_ROWS.forEach(function (row) {
+      if (buckets[row].length) groups.push({ label: row, sites: buckets[row] });
+    });
+    return groups;
+  }
+  function siteRowHeaderEl(label) {
+    return h('div', { className: 'site-row-header', text: label });
+  }
+  function gojuonRowHeaderEl(label) {
+    return siteRowHeaderEl(label === '他' ? '他' : label + '行');
+  }
+
   function setVehicleStatus(vehicleId, status) {
     var v = findVehicle(vehicleId);
     if (!v) return;
@@ -1342,16 +1404,40 @@
   // 個人の「配置枠を変更」・配車ウィザードの両方から使う。
   // onPicked(groupId, site) が呼ばれる。
   // ============================================================
-  function buildSitePickerForGroup(panel, department, close, onPicked, onBack) {
+  function buildSitePickerForGroup(panel, department, close, onPicked, onBack, rowFilter) {
+    rowFilter = rowFilter || 'all';
     panel.innerHTML = '';
     panel.appendChild(modalHeader('現場を選択', '配置する現場をタップしてください'));
+    var allSites = relevantSites(department);
+    var rowOptions = gojuonRowFilterOptions(allSites);
+    if (rowOptions.length) {
+      panel.appendChild(filterChipRow(rowOptions, rowFilter, function (key) {
+        buildSitePickerForGroup(panel, department, close, onPicked, onBack, key);
+      }));
+    }
     var body = h('div', { className: 'modal-body scroll-list' });
-    relevantSites(department).forEach(function (site) {
-      body.appendChild(h('button', {
+    function siteBtn(site) {
+      return h('button', {
         className: 'list-btn site-item', attrs: { type: 'button' },
         onClick: function () { buildGroupChoicePicker(panel, department, site, close, onPicked, onBack); }
-      }, [h('span', { className: 'list-btn-text', text: site.name })]));
-    });
+      }, [h('span', { className: 'list-btn-text', text: site.name })]);
+    }
+    if (rowFilter === 'all') {
+      var frequentSites = allSites.filter(function (s) { return (s.usageCount || 0) > 0; });
+      var restSites = allSites.filter(function (s) { return !(s.usageCount || 0) > 0; });
+      if (frequentSites.length) {
+        body.appendChild(siteRowHeaderEl('よく使う現場'));
+        frequentSites.forEach(function (site) { body.appendChild(siteBtn(site)); });
+      }
+      groupSitesByFuriganaRow(restSites).forEach(function (group) {
+        body.appendChild(gojuonRowHeaderEl(group.label));
+        group.sites.forEach(function (site) { body.appendChild(siteBtn(site)); });
+      });
+    } else {
+      var filtered = allSites.filter(function (s) { return furiganaRowLabel(s.furigana || s.name) === rowFilter; });
+      if (!filtered.length) body.appendChild(h('p', { className: 'record-empty', text: '該当する現場がありません。' }));
+      filtered.forEach(function (site) { body.appendChild(siteBtn(site)); });
+    }
     body.appendChild(h('button', {
       className: 'list-btn site-item', attrs: { type: 'button' },
       onClick: function () { onPicked(null, null); }
@@ -1362,7 +1448,7 @@
       onClick: function () {
         buildNewSiteFormCore(panel,
           function (site) { buildGroupChoicePicker(panel, department, site, close, onPicked, onBack); },
-          function () { buildSitePickerForGroup(panel, department, close, onPicked, onBack); });
+          function () { buildSitePickerForGroup(panel, department, close, onPicked, onBack, rowFilter); });
       }
     }));
     panel.appendChild(cancelBar(close));
@@ -2155,12 +2241,13 @@
     });
   }
 
-  function buildSiteAdminContent(panel, close, filter) {
+  function buildSiteAdminContent(panel, close, filter, rowFilter) {
     filter = filter || 'all';
+    rowFilter = rowFilter || 'all';
     panel.innerHTML = '';
-    var backHere = function () { buildSiteAdminContent(panel, close, filter); };
+    var backHere = function () { buildSiteAdminContent(panel, close, filter, rowFilter); };
     panel.appendChild(modalHeader('現場管理', '一度登録した現場名は消えずに残ります。区分をタップして絞り込み、現場をタップして編集してください'));
-    panel.appendChild(filterChipRow(SITE_ADMIN_FILTERS, filter, function (key) { buildSiteAdminContent(panel, close, key); }));
+    panel.appendChild(filterChipRow(SITE_ADMIN_FILTERS, filter, function (key) { buildSiteAdminContent(panel, close, key, 'all'); }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
 
@@ -2178,21 +2265,41 @@
       });
     } else {
       var cats = filter === 'all' ? SITE_CATEGORY_ORDER : [filter];
+      // 特定の区分に絞り込んでいる時だけ、あ行・か行…の絞り込みチップも出す
+      // (「全て」の時は区分ごとに現場が分かれて表示されるため対象外)。
+      if (filter !== 'all') {
+        var singleCategorySites = state.sites.filter(function (s) { return s.category === filter && s.status === 'active'; });
+        var rowOptions = gojuonRowFilterOptions(singleCategorySites);
+        if (rowOptions.length) {
+          panel.appendChild(filterChipRow(rowOptions, rowFilter, function (key) { buildSiteAdminContent(panel, close, filter, key); }));
+        }
+      }
       var any = false;
       cats.forEach(function (cat) {
         var list = state.sites.filter(function (s) { return s.category === cat && s.status === 'active'; }).sort(compareSiteFurigana);
+        if (filter !== 'all' && rowFilter !== 'all') {
+          list = list.filter(function (s) { return furiganaRowLabel(s.furigana || s.name) === rowFilter; });
+        }
         if (!list.length) return;
         any = true;
         if (filter === 'all') body.appendChild(h('div', { className: 'records-section-title', text: siteCategoryLabel(cat) + 'の現場' }));
-        list.forEach(function (site) {
-          body.appendChild(h('button', {
+        function siteEditBtn(site) {
+          return h('button', {
             className: 'list-btn site-item', attrs: { type: 'button' },
             onClick: function () { buildSiteEditMenu(panel, site.id, close, backHere); }
           }, [
             h('span', { className: 'list-btn-text', text: site.name }),
             h('span', { className: 'list-btn-tag', text: site.furigana || 'フリガナ未設定' })
-          ]));
-        });
+          ]);
+        }
+        if (filter === 'all' && list.length > 15) {
+          groupSitesByFuriganaRow(list).forEach(function (group) {
+            body.appendChild(gojuonRowHeaderEl(group.label));
+            group.sites.forEach(function (site) { body.appendChild(siteEditBtn(site)); });
+          });
+        } else {
+          list.forEach(function (site) { body.appendChild(siteEditBtn(site)); });
+        }
       });
       if (!any) body.appendChild(h('p', { className: 'record-empty', text: '該当する現場がありません。' }));
     }

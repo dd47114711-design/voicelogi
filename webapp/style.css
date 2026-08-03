@@ -456,6 +456,17 @@ button:disabled { cursor: default; }
 }
 .modal-body.scroll-list { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 0.2rem; }
 
+.site-row-header {
+  margin: 0.4rem 0 -0.2rem;
+  padding: 0.2rem 0.7rem;
+  background: #e8edf2;
+  color: #445;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 8px;
+  align-self: flex-start;
+}
+
 .list-btn {
   min-height: 78px;
   border-radius: 12px;
