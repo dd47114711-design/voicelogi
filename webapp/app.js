@@ -712,8 +712,18 @@
     return staff.department;
   }
 
+  // 運輸所属の運転手を先に、土木など掛け持ちで運転手もできる人は
+  // 一覧の一番下にまとめる(普段は土木の人が並びの上の方に来ると
+  // 選びにくいため)。それぞれの塊の中はorder順。
   function dumpDriverCandidates() {
-    return state.staff.filter(function (s) { return s.active !== false && hasWorkRole(s, 'dumpDriver'); });
+    var list = state.staff.filter(function (s) { return s.active !== false && hasWorkRole(s, 'dumpDriver'); });
+    list.sort(function (a, b) {
+      var aOther = a.department !== 'unyu' ? 1 : 0;
+      var bOther = b.department !== 'unyu' ? 1 : 0;
+      if (aOther !== bOther) return aOther - bOther;
+      return (a.order || 0) - (b.order || 0);
+    });
+    return list;
   }
 
   // ============================================================
@@ -1768,7 +1778,7 @@
     panel.appendChild(modalHeader(v.displayName + 'の運転手を選択', 'タップして運転手を選んでください'));
 
     var body = h('div', { className: 'modal-body scroll-list' });
-    var candidates = sortByOrder(dumpDriverCandidates());
+    var candidates = dumpDriverCandidates();
     candidates.forEach(function (s) {
       var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
       body.appendChild(h('button', {
@@ -1897,8 +1907,8 @@
       panel.appendChild(modalHeader((department === 'unyu' ? '運転手' : '作業員') + 'を追加', g.displayLabel + 'へ追加する人をタップして選んでください(複数選択可)'));
       panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + selected.length + '人' }));
       var body = h('div', { className: 'modal-body scroll-list' });
-      var pool = department === 'unyu' ? dumpDriverCandidates() : state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; });
-      var candidates = sortByOrder(pool.filter(function (s) { return s.todayGroupId !== groupId; }));
+      var pool = department === 'unyu' ? dumpDriverCandidates() : sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
+      var candidates = pool.filter(function (s) { return s.todayGroupId !== groupId; });
       candidates.forEach(function (s) {
         var isSel = selected.indexOf(s.id) !== -1;
         var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
@@ -2718,8 +2728,8 @@
     panel.appendChild(modalHeader((ws.department === 'unyu' ? '運転手' : '作業員') + 'を選択', 'タップして選んでください(複数選択可)。現場未定のまま登録します。'));
     panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人' }));
     var body = h('div', { className: 'modal-body scroll-list' });
-    var pool = ws.department === 'unyu' ? dumpDriverCandidates() : state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; });
-    sortByOrder(pool).forEach(function (s) {
+    var pool = ws.department === 'unyu' ? dumpDriverCandidates() : sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
+    pool.forEach(function (s) {
       var selected = ws.staffIds.indexOf(s.id) !== -1;
       var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
       body.appendChild(h('button', {
@@ -2777,14 +2787,34 @@
   // 通常と違う車に乗せたい時・運転手なしでダンプだけ駐車したい時は、
   // 次の確認画面でその都度タップして調整する。
   function buildWizardDriverMultiUnyu(panel, close, ws) {
+    if (typeof ws.showAssigned === 'undefined') ws.showAssigned = false;
+    var prevBody = panel.querySelector('.modal-body.scroll-list');
+    var prevScrollTop = prevBody ? prevBody.scrollTop : 0;
     panel.innerHTML = '';
     var g = findGroup(ws.groupId);
     panel.appendChild(wizardProgress('unyu', 3));
     panel.appendChild(modalHeader('運転手を選択', g.displayLabel + 'へ配置する運転手をタップして選んでください(複数選択可)。通常のダンプが空いていれば自動でセットになります。'));
     panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人 ／ ダンプ：' + ws.vehicleIds.length + '台' }));
 
+    var allCandidates = dumpDriverCandidates();
+    var hiddenCount = allCandidates.filter(function (s) {
+      return ws.staffIds.indexOf(s.id) === -1 && isDriverAlreadyInOtherGroup(s, ws.groupId);
+    }).length;
+    if (hiddenCount || ws.showAssigned) {
+      panel.appendChild(h('div', { className: 'filter-chip-row' }, [
+        h('button', {
+          className: 'filter-chip' + (ws.showAssigned ? ' is-active' : ''),
+          attrs: { type: 'button' },
+          text: ws.showAssigned ? '配置済みの人を隠す' : '配置済みの人も表示(編集) (' + hiddenCount + '人)',
+          onClick: function () { ws.showAssigned = !ws.showAssigned; buildWizardDriverMultiUnyu(panel, close, ws); }
+        })
+      ]));
+    }
+
     var body = h('div', { className: 'modal-body scroll-list' });
-    var candidates = sortByOrder(dumpDriverCandidates());
+    var candidates = ws.showAssigned ? allCandidates : allCandidates.filter(function (s) {
+      return ws.staffIds.indexOf(s.id) !== -1 || !isDriverAlreadyInOtherGroup(s, ws.groupId);
+    });
     candidates.forEach(function (s) {
       var selected = ws.staffIds.indexOf(s.id) !== -1;
       var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
@@ -2803,6 +2833,9 @@
       ]));
     });
     panel.appendChild(body);
+    if (prevScrollTop) {
+      requestAnimationFrame(function () { body.scrollTop = prevScrollTop; });
+    }
 
     var actionRow = h('div', { className: 'modal-footer two-col' });
     actionRow.appendChild(h('button', {
