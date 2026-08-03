@@ -152,6 +152,10 @@
     if (!loaded.assignments) { loaded.assignments = []; changed = true; }
     if (!loaded.scheduleEvents) { loaded.scheduleEvents = []; changed = true; }
 
+    loaded.sites.forEach(function (site) {
+      if (typeof site.furigana === 'undefined') { site.furigana = ''; changed = true; }
+    });
+
     loaded.staff.forEach(function (s) {
       if (!s.workRoles) {
         s.workRoles = s.department === 'doboku' ? ['civil'] : s.department === 'unyu' ? ['dumpDriver'] : ['office'];
@@ -400,7 +404,7 @@
     }, 2800);
   }
 
-  function addSite(name, category) {
+  function addSite(name, category, furigana) {
     var trimmed = (name || '').trim();
     if (!trimmed) return { ok: false, reason: 'empty' };
     var exists = state.sites.some(function (s) { return s.name === trimmed; });
@@ -409,6 +413,7 @@
     var site = {
       id: genId('site'),
       name: trimmed,
+      furigana: (furigana || '').trim(),
       category: category,
       status: 'active',
       order: maxOrder + 1,
@@ -418,6 +423,15 @@
     state.sites.push(site);
     persist();
     return { ok: true, site: site };
+  }
+
+  // フリガナ(カタカナ)に基づく現場のあかさたな順比較。フリガナが
+  // 未登録(旧データの移行直後)の現場は現場名で代用する。
+  function siteFuriganaSortKey(site) {
+    return (site.furigana && site.furigana.trim()) || site.name || '';
+  }
+  function compareSiteFurigana(a, b) {
+    return siteFuriganaSortKey(a).localeCompare(siteFuriganaSortKey(b), 'ja');
   }
 
   function setVehicleStatus(vehicleId, status) {
@@ -439,10 +453,13 @@
     var sites = state.sites.filter(function (site) {
       return site.status === 'active' && (site.category === department || site.category === 'common');
     });
+    // よく使う現場(usageCount>0)を先頭の階層にまとめ、各階層の中は
+    // フリガナのあかさたな順に並べる。
     sites.sort(function (a, b) {
-      var diff = (b.usageCount || 0) - (a.usageCount || 0);
-      if (diff !== 0) return diff;
-      return (a.order || 0) - (b.order || 0);
+      var aTier = (a.usageCount || 0) > 0 ? 0 : 1;
+      var bTier = (b.usageCount || 0) > 0 ? 0 : 1;
+      if (aTier !== bTier) return aTier - bTier;
+      return compareSiteFurigana(a, b);
     });
     return sites;
   }
@@ -1226,9 +1243,15 @@
       className: 'form-input',
       attrs: { type: 'text', inputmode: 'text', autocomplete: 'off', placeholder: '例：〇〇現場' }
     });
+    var furiganaInput = h('input', {
+      className: 'form-input',
+      attrs: { type: 'text', inputmode: 'text', autocomplete: 'off', placeholder: '例：マルマルゲンバ(カタカナ)' }
+    });
 
     body.appendChild(h('label', { className: 'form-label', text: '現場名' }));
     body.appendChild(input);
+    body.appendChild(h('label', { className: 'form-label', text: 'フリガナ(あかさたな順の並び替えに使います)' }));
+    body.appendChild(furiganaInput);
     body.appendChild(errorMsg);
     body.appendChild(h('label', { className: 'form-label', text: '現場区分' }));
 
@@ -1267,12 +1290,17 @@
           errorMsg.classList.remove('hidden');
           return;
         }
+        if (!furiganaInput.value.trim()) {
+          errorMsg.textContent = 'フリガナを入力してください。';
+          errorMsg.classList.remove('hidden');
+          return;
+        }
         if (!selectedCategory) {
           errorMsg.textContent = '現場区分を選択してください。';
           errorMsg.classList.remove('hidden');
           return;
         }
-        var result = addSite(input.value, selectedCategory);
+        var result = addSite(input.value, selectedCategory, furiganaInput.value);
         if (!result.ok) {
           errorMsg.textContent = '同じ名前の現場が既に登録されています。';
           errorMsg.classList.remove('hidden');
@@ -2044,6 +2072,7 @@
     // 使用停止にした現場でも、既に動いている配置枠は編集できるようにする
     // (現場マスタの使用停止/使用可能は「新規作成」の候補一覧にのみ影響する)。
     var candidateSites = state.sites.filter(function (site) { return site.category === department || site.category === 'common'; });
+    candidateSites.sort(compareSiteFurigana);
     var sitesWithGroups = candidateSites.filter(function (site) { return groupsForSite(site.id, department, true).length > 0; });
     if (!sitesWithGroups.length) body.appendChild(h('p', { className: 'record-empty', text: '現在、配置されている現場はありません。' }));
     sitesWithGroups.forEach(function (site) {
@@ -2113,7 +2142,7 @@
     var body = h('div', { className: 'modal-body scroll-list' });
 
     if (filter === 'inactive') {
-      var inactiveSites = sortByOrder(state.sites.filter(function (s) { return s.status !== 'active'; }));
+      var inactiveSites = state.sites.filter(function (s) { return s.status !== 'active'; }).sort(compareSiteFurigana);
       if (!inactiveSites.length) body.appendChild(h('p', { className: 'record-empty', text: '使用停止中の現場はありません。' }));
       inactiveSites.forEach(function (site) {
         body.appendChild(h('button', {
@@ -2128,7 +2157,7 @@
       var cats = filter === 'all' ? SITE_CATEGORY_ORDER : [filter];
       var any = false;
       cats.forEach(function (cat) {
-        var list = sortByOrder(state.sites.filter(function (s) { return s.category === cat && s.status === 'active'; }));
+        var list = state.sites.filter(function (s) { return s.category === cat && s.status === 'active'; }).sort(compareSiteFurigana);
         if (!list.length) return;
         any = true;
         if (filter === 'all') body.appendChild(h('div', { className: 'records-section-title', text: siteCategoryLabel(cat) + 'の現場' }));
@@ -2137,7 +2166,8 @@
             className: 'list-btn site-item', attrs: { type: 'button' },
             onClick: function () { buildSiteEditMenu(panel, site.id, close, backHere); }
           }, [
-            h('span', { className: 'list-btn-text', text: site.name })
+            h('span', { className: 'list-btn-text', text: site.name }),
+            h('span', { className: 'list-btn-tag', text: site.furigana || 'フリガナ未設定' })
           ]));
         });
       });
@@ -2163,7 +2193,7 @@
 
     var body = h('div', { className: 'modal-body big-choice-list' });
     body.appendChild(h('button', {
-      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '現場名を修正',
+      className: 'choice-btn choice-move', attrs: { type: 'button' }, text: '現場名・フリガナを修正',
       onClick: function () { buildSiteRenameForm(panel, siteId, close, backHere); }
     }));
     body.appendChild(h('button', {
@@ -2180,13 +2210,17 @@
   function buildSiteRenameForm(panel, siteId, close, onBack) {
     panel.innerHTML = '';
     var site = findSite(siteId);
-    panel.appendChild(modalHeader('現場名を修正', '新しい現場名を入力してください(既に配置枠が動いている現場では、動いている配置枠の表示名は変わりません)'));
+    panel.appendChild(modalHeader('現場名・フリガナを修正', '新しい現場名とフリガナを入力してください(既に配置枠が動いている現場では、動いている配置枠の表示名は変わりません)'));
     var body = h('div', { className: 'modal-body' });
     var errorMsg = h('p', { className: 'form-error hidden' });
     var input = h('input', { className: 'form-input', attrs: { type: 'text', inputmode: 'text', autocomplete: 'off' } });
     input.value = site.name;
+    var furiganaInput = h('input', { className: 'form-input', attrs: { type: 'text', inputmode: 'text', autocomplete: 'off', placeholder: '例：マルマルゲンバ(カタカナ)' } });
+    furiganaInput.value = site.furigana || '';
     body.appendChild(h('label', { className: 'form-label', text: '現場名' }));
     body.appendChild(input);
+    body.appendChild(h('label', { className: 'form-label', text: 'フリガナ(あかさたな順の並び替えに使います)' }));
+    body.appendChild(furiganaInput);
     body.appendChild(errorMsg);
     panel.appendChild(body);
     var footer = h('div', { className: 'modal-footer two-col' });
@@ -2196,9 +2230,12 @@
       onClick: function () {
         var trimmed = input.value.trim();
         if (!trimmed) { errorMsg.textContent = '現場名を入力してください。'; errorMsg.classList.remove('hidden'); return; }
+        var trimmedFurigana = furiganaInput.value.trim();
+        if (!trimmedFurigana) { errorMsg.textContent = 'フリガナを入力してください。'; errorMsg.classList.remove('hidden'); return; }
         var dup = state.sites.some(function (s) { return s.id !== siteId && s.name === trimmed; });
         if (dup) { errorMsg.textContent = '同じ名前の現場が既に登録されています。'; errorMsg.classList.remove('hidden'); return; }
         site.name = trimmed;
+        site.furigana = trimmedFurigana;
         persist(); renderAll();
         onBack();
       }

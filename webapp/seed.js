@@ -107,7 +107,7 @@
       // (dispatchGroups)とは別のデータで、現場名だけでは人・車両を
       // グルーピングしない。
       sites: [
-        { id: 'site_1', name: '本社', category: 'common', status: 'active', order: 1, createdAt: '2026-01-01T00:00:00.000Z', usageCount: 0 }
+        { id: 'site_1', name: '本社', furigana: 'ホンシャ', category: 'common', status: 'active', order: 1, createdAt: '2026-01-01T00:00:00.000Z', usageCount: 0 }
       ],
 
       vehicles: [
