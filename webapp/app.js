@@ -1045,7 +1045,12 @@
 
       children.push(h('div', { className: 'site-group' }, [driverCol, siteGroupTag(lane, department), vehicleCol]));
     }
-    return h('div', { className: 'site-lane ' + laneColorClass(lane, department) }, children);
+    // 現場グループ(kind==='site')で人・台数が少ない時だけ、横に2つ
+    // 並べて表示してスペースを有効活用する(3人/3台以上は1行占有)。
+    var laneSize = Math.max(members.length, pairs.length);
+    var isCompact = lane.kind === 'site' && laneSize > 0 && laneSize <= 2;
+    var laneClass = 'site-lane ' + laneColorClass(lane, department) + (isCompact ? ' is-compact-lane' : '');
+    return h('div', { className: laneClass }, children);
   }
 
   function renderDepartment(containerId, department) {

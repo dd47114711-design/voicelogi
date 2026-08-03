@@ -217,7 +217,9 @@ button:disabled { cursor: default; }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: 16px;
   padding: 18px 20px 30px;
 }
@@ -232,10 +234,17 @@ button:disabled { cursor: default; }
 }
 
 .site-lane {
-  flex: 0 0 auto;
+  flex: 1 1 100%;
+  width: 100%;
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+/* 人・台数が1〜2の現場グループは、隣同士なら横並びにしてスペースを
+   節約する(3以上ある現場はこれまで通り1行を占有)。 */
+.site-lane.is-compact-lane {
+  flex: 0 1 calc(50% - 8px);
+  width: calc(50% - 8px);
 }
 
 .lane-header {
