@@ -187,6 +187,19 @@
       if (typeof s.todayGroupId === 'undefined') { s.todayGroupId = null; changed = true; }
       if (typeof s.active === 'undefined') { s.active = true; changed = true; }
     });
+
+    // 小野一也(土木)・森元義紀(運輸)は土木・運輸どちらの現場にも
+    // 入るため、黒瀬大祐・黒瀬剛と同じくcivil・dumpDriver両方の
+    // 役割を持たせる(既に稼働中のデータにも反映する)。
+    var CROSSOVER_ROLE_STAFF = { '小野一也': ['civil', 'dumpDriver'], '森元義紀': ['dumpDriver', 'civil'] };
+    loaded.staff.forEach(function (s) {
+      var wanted = CROSSOVER_ROLE_STAFF[s.name];
+      if (!wanted) return;
+      var missing = wanted.some(function (role) { return s.workRoles.indexOf(role) === -1; });
+      if (!missing) return;
+      wanted.forEach(function (role) { if (s.workRoles.indexOf(role) === -1) s.workRoles.push(role); });
+      changed = true;
+    });
     loaded.vehicles.forEach(function (v) {
       if (typeof v.todayGroupId === 'undefined') { v.todayGroupId = null; changed = true; }
     });
@@ -720,6 +733,20 @@
     list.sort(function (a, b) {
       var aOther = a.department !== 'unyu' ? 1 : 0;
       var bOther = b.department !== 'unyu' ? 1 : 0;
+      if (aOther !== bOther) return aOther - bOther;
+      return (a.order || 0) - (b.order || 0);
+    });
+    return list;
+  }
+
+  // 土木の作業員候補も同じ考え方で、civil役割を持つ人なら所属部門に
+  // 関わらず選べるようにする(運輸所属で土木も掛け持ちする人向け)。
+  // 土木所属を先に、掛け持ちの人は一覧の一番下にまとめる。
+  function civilStaffCandidates() {
+    var list = state.staff.filter(function (s) { return s.active !== false && hasWorkRole(s, 'civil'); });
+    list.sort(function (a, b) {
+      var aOther = a.department !== 'doboku' ? 1 : 0;
+      var bOther = b.department !== 'doboku' ? 1 : 0;
       if (aOther !== bOther) return aOther - bOther;
       return (a.order || 0) - (b.order || 0);
     });
@@ -1912,7 +1939,7 @@
       panel.appendChild(modalHeader((department === 'unyu' ? '運転手' : '作業員') + 'を追加', g.displayLabel + 'へ追加する人をタップして選んでください(複数選択可)'));
       panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + selected.length + '人' }));
       var body = h('div', { className: 'modal-body scroll-list' });
-      var pool = department === 'unyu' ? dumpDriverCandidates() : sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
+      var pool = department === 'unyu' ? dumpDriverCandidates() : civilStaffCandidates();
       var candidates = pool.filter(function (s) { return s.todayGroupId !== groupId; });
       candidates.forEach(function (s) {
         var isSel = selected.indexOf(s.id) !== -1;
@@ -2733,7 +2760,7 @@
     panel.appendChild(modalHeader((ws.department === 'unyu' ? '運転手' : '作業員') + 'を選択', 'タップして選んでください(複数選択可)。現場未定のまま登録します。'));
     panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人' }));
     var body = h('div', { className: 'modal-body scroll-list' });
-    var pool = ws.department === 'unyu' ? dumpDriverCandidates() : sortByOrder(state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; }));
+    var pool = ws.department === 'unyu' ? dumpDriverCandidates() : civilStaffCandidates();
     pool.forEach(function (s) {
       var selected = ws.staffIds.indexOf(s.id) !== -1;
       var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
@@ -2925,8 +2952,8 @@
     panel.appendChild(h('div', { className: 'current-line', text: '選択中：' + ws.staffIds.length + '人' }));
 
     var body = h('div', { className: 'modal-body scroll-list' });
-    var pool = state.staff.filter(function (s) { return s.department === 'doboku' && s.active !== false; });
-    sortByOrder(pool).forEach(function (s) {
+    var pool = civilStaffCandidates();
+    pool.forEach(function (s) {
       var selected = ws.staffIds.indexOf(s.id) !== -1;
       var sGroup = s.todayGroupId ? findGroup(s.todayGroupId) : null;
       body.appendChild(h('button', {
@@ -2937,6 +2964,7 @@
         h('span', { className: 'select-mark', text: selected ? '■' : '□' }),
         h('span', { className: 'list-btn-text', text: s.name }),
         h('span', { className: 'status-badge ' + (s.attendance === 'present' ? 'status-available' : 'status-suspended'), text: s.attendance === 'present' ? '出勤' : '退勤' }),
+        (s.department !== 'doboku' && !selected) ? h('span', { className: 'list-btn-tag', text: DEPT_LABELS[s.department] }) : null,
         (sGroup && !selected) ? h('span', { className: 'list-btn-tag', text: sGroup.displayLabel }) : null
       ]));
     });

@@ -30,7 +30,7 @@
           normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 2, active: true },
         { id: 'st_3', name: '垣﨑和幸', department: 'doboku', workRoles: ['civil'], attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 3, active: true },
-        { id: 'st_4', name: '小野一也', department: 'doboku', workRoles: ['civil'], attendance: 'absent',
+        { id: 'st_4', name: '小野一也', department: 'doboku', workRoles: ['civil', 'dumpDriver'], attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 4, active: true },
         { id: 'st_5', name: '桒野修平', department: 'doboku', workRoles: ['civil'], attendance: 'absent',
           normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 5, active: true },
@@ -48,7 +48,7 @@
           normalVehicleId: null, todayVehicleId: null, todayGroupId: null, order: 11, active: true },
 
         // ---- 運輸部門(ダンプ運転手。通常ダンプは車番と対応) ----
-        { id: 'st_10', name: '森元義紀', department: 'unyu', workRoles: ['dumpDriver'], attendance: 'absent',
+        { id: 'st_10', name: '森元義紀', department: 'unyu', workRoles: ['dumpDriver', 'civil'], attendance: 'absent',
           normalVehicleId: 'v_1', todayVehicleId: null, todayGroupId: null, order: 1, active: true },
         { id: 'st_11', name: '黒瀬優貴', department: 'unyu', workRoles: ['dumpDriver'], attendance: 'absent',
           normalVehicleId: 'v_2', todayVehicleId: null, todayGroupId: null, order: 2, active: true },
