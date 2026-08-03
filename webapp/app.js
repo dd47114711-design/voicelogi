@@ -1034,10 +1034,25 @@
     return 'lane-' + lane.kind + '-' + department;
   }
 
+  // 運転手(作業員)とダンプの組合せを1枚の札にまとめて表示するため、
+  // membersとpairsを突き合わせて「1人(+車両があれば車両)」の並びを
+  // 作る。パートナーの居ない駐車のみの車両は末尾にまとめる。
+  function buildPairEntries(members, pairs) {
+    var vehicleForDriver = {};
+    var vehicleOnlyPairs = [];
+    pairs.forEach(function (p) {
+      if (p.driver) vehicleForDriver[p.driver.id] = p.vehicle;
+      else vehicleOnlyPairs.push(p);
+    });
+    var entries = members.map(function (s) { return { vehicle: vehicleForDriver[s.id] || null, driver: s }; });
+    vehicleOnlyPairs.forEach(function (p) { entries.push(p); });
+    return entries;
+  }
+
   // ------------------------------------------------------------
-  // 配置グループの表示: 実物の札ボードと同じく、
-  //   左＝運転手(作業員)の名前札を複数、中央＝現場名の札、
-  //   右＝ダンプ札を複数 という3カラムで組み立てる。
+  // 配置グループの表示: 中央に現場名の札、その右に運転手(作業員)＋
+  // 車番を1枚にまとめた札を並べる(実物の木札と同じく、名前とダンプは
+  // 必ずセットで1枚)。
   // ------------------------------------------------------------
   function buildLaneEl(lane, department) {
     var isVehicleLane = lane.kind === 'vehicle';
@@ -1064,13 +1079,10 @@
 
     var children = [header];
     if (open) {
-      var driverCol = h('div', { className: 'driver-tags' });
-      members.forEach(function (s) { driverCol.appendChild(driverTag(s)); });
+      var pairCol = h('div', { className: 'pair-tags' });
+      buildPairEntries(members, pairs).forEach(function (entry) { pairCol.appendChild(pairTag(entry, lane)); });
 
-      var vehicleCol = h('div', { className: 'vehicle-tags' });
-      pairs.forEach(function (p) { vehicleCol.appendChild(vehicleTag(p.vehicle, p.driver, lane)); });
-
-      children.push(h('div', { className: 'site-group' }, [driverCol, siteGroupTag(lane, department), vehicleCol]));
+      children.push(h('div', { className: 'site-group' }, [siteGroupTag(lane, department), pairCol]));
     }
     // 現場グループ(kind==='site')で人・台数が少ない時だけ、横に2つ
     // 並べて表示してスペースを有効活用する(3人/3台以上は1行占有)。
@@ -1094,48 +1106,54 @@
   }
 
   // ---- 個々の札(タグ) ----
-  // 運転手(作業員)の名前札。出勤=白、退勤=赤。本人・今後の予定
-  // (講習・会議など)があれば📅バッジを付けて、タップ前から分かるようにする。
-  function driverTag(s) {
-    var dept = effectiveDisplayDept(s);
-    var deptClass = dept === 'unyu' ? 'dept-unyu' : 'dept-doboku';
-    return h('button', {
-      className: 'tag tag-name ' + deptClass + ' ' + (s.attendance === 'present' ? 'is-present' : 'is-absent'),
-      attrs: { type: 'button' },
-      onClick: function () {
-        if (dept === 'unyu') openDispatchEditMenu(s.id);
-        else openDobokuMenu(s.id);
-      }
-    }, [
-      h('span', { className: 'tag-name-text', html: verticalHtml(s.name) }),
-      eventsForStaff(s.id).length ? h('span', { className: 'tag-event-badge', text: '📅' }) : null
-    ]);
+  // 車両表示名(例:「10tダンプ8」「4tダンプ3439」)から車種を省いた
+  // 車番だけを取り出す(末尾の数字部分)。
+  function vehicleNumberLabel(v) {
+    if (!v) return '';
+    var m = String(v.displayName || '').match(/(\d+)$/);
+    return m ? m[1] : v.displayName;
   }
 
-  // ダンプ(車両)札。現場グループの右側に並ぶ。
-  function vehicleTag(v, driver, lane) {
+  // 運転手(作業員)＋ダンプを1枚にまとめた札。名前は縦書き、車番は
+  // その下に横書き(「10tダンプ」等は付けず番号のみ)。出勤=白、
+  // 退勤=赤。本人・今後の予定(講習・会議など)があれば📅バッジを付ける。
+  // 駐車のみで運転手がいない車両は、車番だけの札になる。
+  function pairTag(entry, lane) {
+    var driver = entry.driver;
+    var v = entry.vehicle;
+    if (driver) {
+      var dept = effectiveDisplayDept(driver);
+      var deptClass = dept === 'unyu' ? 'dept-unyu' : 'dept-doboku';
+      var overrideTag = (v && findAssignmentForStaff(driver.id) && v.id !== driver.normalVehicleId && lane.kind === 'site')
+        ? h('span', { className: 'tag-badge', text: '本日のみ' }) : null;
+      return h('button', {
+        className: 'tag tag-name ' + deptClass + ' ' + (driver.attendance === 'present' ? 'is-present' : 'is-absent'),
+        attrs: { type: 'button' },
+        onClick: function () {
+          if (dept === 'unyu') openDispatchEditMenu(driver.id);
+          else openDobokuMenu(driver.id);
+        }
+      }, [
+        h('span', { className: 'tag-name-text', html: verticalHtml(driver.name) }),
+        v ? h('span', { className: 'tag-carno', text: vehicleNumberLabel(v) }) : null,
+        eventsForStaff(driver.id).length ? h('span', { className: 'tag-event-badge', text: '📅' }) : null,
+        overrideTag
+      ]);
+    }
+
     var warn = v.status !== 'available';
-    var parkedNoDriver = !driver && lane.kind === 'site' && isVehicleParkedWithoutDriver(v);
-    var overrideTag = (driver && findAssignmentForStaff(driver.id) && v.id !== driver.normalVehicleId && lane.kind === 'site')
-      ? h('span', { className: 'tag-badge', text: '本日のみ' }) : null;
+    var parkedNoDriver = lane.kind === 'site' && isVehicleParkedWithoutDriver(v);
     return h('button', {
       className: 'tag tag-info' + (warn ? ' is-warning' : '') + (parkedNoDriver ? ' is-unset' : ''),
       attrs: { type: 'button' },
       onClick: function () {
-        if (driver) {
-          if (lane.kind === 'site') { openDispatchEditMenu(driver.id); return; }
-          openVehicleStatusStandalone(v.id);
-          return;
-        }
         if (parkedNoDriver) { openParkedVehicleMenu(v.id, lane.key); return; }
         openVehicleStatusStandalone(v.id);
       }
     }, [
-      h('span', { className: 'tag-caption', html: verticalHtml(driver ? 'ダンプ' : '車両') }),
-      h('span', { className: 'tag-value', html: verticalHtml(v.displayName) }),
+      h('span', { className: 'tag-carno', text: vehicleNumberLabel(v) }),
       warn ? h('span', { className: 'tag-badge tag-badge-warning', text: VEHICLE_STATUS_LABELS[v.status] }) : null,
-      parkedNoDriver ? h('span', { className: 'tag-badge', text: '運転手未定' }) : null,
-      overrideTag
+      parkedNoDriver ? h('span', { className: 'tag-badge', text: '運転手未定' }) : null
     ]);
   }
 

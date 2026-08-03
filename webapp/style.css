@@ -276,10 +276,9 @@ button:disabled { cursor: default; }
 .lane-vehicle-broken .lane-header { background: #c0392b; }
 .lane-vehicle-suspended .lane-header { background: #5d6470; }
 
-/* 現場グループ: 左＝運転手(作業員)札、中央＝現場名の札、右＝ダンプ札の
-   3カラム。運転手とダンプは1組の小カードに結合せず、それぞれ独立した
-   札として並べる。どちらか一方が無い行(空車・休み等)は、その列ごと
-   自動的に詰める。 */
+/* 現場グループ: 左＝現場名の札、右＝運転手(作業員)＋ダンプ番号を
+   1枚にまとめた札を複数。実物の木札と同じく、名前とダンプ番号は
+   常にセットで1枚のカードに乗せる(駐車のみの車両だけ番号のみの札)。 */
 .site-group {
   display: flex;
   align-items: flex-start;
@@ -291,19 +290,16 @@ button:disabled { cursor: default; }
 }
 .stack-unyu .site-group { background-color: #ccd4da; }
 
-.driver-tags,
-.vehicle-tags {
+.pair-tags {
   flex: 1 1 0;
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
+  justify-content: flex-start;
   gap: 12px 14px;
   min-width: 0;
 }
-.driver-tags { justify-content: flex-end; }
-.vehicle-tags { justify-content: flex-start; }
-.driver-tags:empty,
-.vehicle-tags:empty { display: none; }
+.pair-tags:empty { display: none; }
 
 .tag {
   min-width: 96px;
@@ -365,6 +361,15 @@ button:disabled { cursor: default; }
 .tag-name.is-present { background: #fbfaf7; color: #1b2733; }
 .tag-name.is-absent { background: #b6362a; color: #fff8f6; }
 .tag-name.is-absent .tag-name-text { color: #fff8f6; }
+
+/* 名前の下に横書きで表示する車番(「10tダンプ」等の車種は付けず番号のみ)。 */
+.tag-carno {
+  writing-mode: horizontal-tb;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.tag-info .tag-carno { font-size: 1.3rem; }
 
 /* 名前札の右上に付く、講習・会議など今後の予定バッジ */
 .tag-event-badge {
