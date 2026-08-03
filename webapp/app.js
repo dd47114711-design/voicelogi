@@ -156,6 +156,29 @@
       if (typeof site.furigana === 'undefined') { site.furigana = ''; changed = true; }
     });
 
+    // 運輸の業者名マスタ(単価表エクセルより)を、既に稼働中のデータにも
+    // 反映する(名前が完全一致する現場は既存のものをそのまま使い、
+    // 無いものだけ追加する)。
+    if (typeof createSeedState === 'function') {
+      var existingSiteNames = {};
+      var existingSiteIds = {};
+      loaded.sites.forEach(function (site) { existingSiteNames[site.name] = true; existingSiteIds[site.id] = true; });
+      var seedSites = createSeedState().sites;
+      seedSites.forEach(function (seedSite) {
+        if (existingSiteNames[seedSite.name]) return;
+        var maxOrder = loaded.sites.reduce(function (m, s) { return Math.max(m, s.order || 0); }, 0);
+        var newId = existingSiteIds[seedSite.id] ? genId('site') : seedSite.id;
+        loaded.sites.push({
+          id: newId, name: seedSite.name, furigana: seedSite.furigana,
+          category: seedSite.category, status: 'active', order: maxOrder + 1,
+          createdAt: seedSite.createdAt, usageCount: 0
+        });
+        existingSiteNames[seedSite.name] = true;
+        existingSiteIds[newId] = true;
+        changed = true;
+      });
+    }
+
     loaded.staff.forEach(function (s) {
       if (!s.workRoles) {
         s.workRoles = s.department === 'doboku' ? ['civil'] : s.department === 'unyu' ? ['dumpDriver'] : ['office'];
