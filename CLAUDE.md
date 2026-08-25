@@ -32,13 +32,6 @@ npm レジストリで確認済みの最新版（2026-08-03 時点）を使う�
 | パッケージマネージャ | pnpm | |
 | デプロイ | Vercel | `main` = 本番 |
 
-### 着手前に解消が必要な前提
-
-この端末に以下が入っていない。最初の issue の前に導入すること（`winget` は利用可）。
-
-- **Node.js（および pnpm）** — 未インストール。`winget install OpenJS.NodeJS.LTS` → `corepack enable pnpm`
-- **GitHub CLI (`gh`)** — 未インストール。issue 運用に必須。`winget install GitHub.cli` → `gh auth login`
-
 ## 開発フロー
 
 ### issue 起点
@@ -61,7 +54,6 @@ main（本番 / Vercel Production）
 
 - 作業ブランチは必ず `dev` から切り、`dev` へ PR を出す。
 - `main` へは `dev` からのみマージする。`main` へ直接 push・直接 PR しない。
-- `dev` ブランチは未作成。最初に `main` から作る。
 
 ### worktree + superpowers
 
