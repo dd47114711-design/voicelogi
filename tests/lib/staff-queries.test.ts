@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { getStaffCount } from '@/app/actions/staff'
+import { getStaffCount } from '@/lib/queries/staff'
 
 describe('getStaffCount', () => {
   let adminClient: SupabaseClient

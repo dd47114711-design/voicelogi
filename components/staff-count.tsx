@@ -1,4 +1,4 @@
-import { getStaffCount } from '@/app/actions/staff'
+import { getStaffCount } from '@/lib/queries/staff'
 
 export async function StaffCount() {
   const count = await getStaffCount()
