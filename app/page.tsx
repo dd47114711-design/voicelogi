@@ -1,17 +1,18 @@
-import { Suspense } from 'react'
-import { StaffCount } from '@/components/staff-count'
+import { ClockHeader } from '@/components/board/clock-header'
+import { RealtimeBoardWatcher } from '@/components/board/realtime-board-watcher'
+import { DepartmentBoard } from '@/components/board/department-board'
 
-// この画面はDBへの生の接続確認が目的なので、ビルド時に静的生成させない。
-// （ビルド時点では環境変数が未設定なこともある）
+// 複数端末でリアルタイム同期する盤面のため、ビルド時に静的化させず毎回サーバでレンダリングする。
+// 静的化されると RealtimeBoardWatcher の router.refresh() が本番で無意味になる。
 export const dynamic = 'force-dynamic'
 
-export default function Home() {
+export default function BoardPage() {
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold mb-4">VoiceLogi 接続確認</h1>
-      <Suspense fallback={<p>読み込み中...</p>}>
-        <StaffCount />
-      </Suspense>
+    <main className="flex flex-col gap-8 p-4">
+      <ClockHeader />
+      <RealtimeBoardWatcher />
+      <DepartmentBoard department="土木" />
+      <DepartmentBoard department="運輸" />
     </main>
   )
 }
