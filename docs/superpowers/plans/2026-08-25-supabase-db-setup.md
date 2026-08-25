@@ -4,7 +4,7 @@
 
 **Goal:** 新実装（Next.js + Supabase）の起点として、旧実装をlegacyへ退避し、Next.js雛形を作り、Supabase Postgres上に実テーブルを作成し、Server Action経由で疎通確認する。
 
-**Architecture:** ORMを使わず、Next.js Server Actions内で`@supabase/supabase-js`を直接呼び出す構成。スキーマはSupabase CLIのSQLマイグレーション（`supabase/migrations/*.sql`）でgit管理し、`supabase db push`でリモートのSupabaseプロジェクト「ボイスロジ」に適用する。
+**Architecture:** ORMを使わず、Next.js Server Actions内で`@supabase/supabase-js`を直接呼び出す構成。スキーマはSupabase CLIのSQLマイグレーション（`supabase/migrations/*.sql`）でgit管理し、`supabase db push`でリモートのSupabaseプロジェクト「v-logi」に適用する。
 
 **Tech Stack:** Next.js 16 (App Router) / React 19 / TypeScript (strict) / Tailwind CSS / pnpm / `@supabase/supabase-js` / Supabase CLI / Vitest
 
@@ -30,7 +30,7 @@ Task 1（Supabase CLIログイン）は**ブラウザでの対話的な認証操
 
 ---
 
-### Task 1: Supabase CLIでログインし、プロジェクト「ボイスロジ」の接続情報を取得する
+### Task 1: Supabase CLIでログインし、プロジェクト「v-logi」の接続情報を取得する
 
 **Files:**
 - Create: `.env.local`（gitignore対象、コミットしない）
@@ -39,7 +39,14 @@ Task 1（Supabase CLIログイン）は**ブラウザでの対話的な認証操
 **Interfaces:**
 - Produces: 環境変数 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`（以降の全タスクが利用）
 
-- [ ] **Step 1: Supabase CLIにログインする**
+> **完了済み（2026-08-25、メインセッションで対話的に実行）。** 当初リンク予定だった
+> 「ボイスロジ」プロジェクトが一時停止（pause）状態から復元できず、本人が同日中に
+> 新規プロジェクト **「v-logi」**（ref: `tggdbwsqpvzsojwuwlcn`、AWS ap-northeast-1）を
+> 作り直した。ログインはブラウザ認可ではなくアクセストークン
+> （`npx supabase login --token <token>`）で行った。`.env.local` 作成済み、
+> `npx supabase link --project-ref tggdbwsqpvzsojwuwlcn` 実行済み。
+
+- [x] **Step 1: Supabase CLIにログインする**
 
 リポジトリルート（`D:\dev\voicelogi`）で実行:
 
@@ -50,22 +57,26 @@ npx supabase login
 ブラウザが開くので認可する。CLIが開けない・ブラウザ連携できない場合は、Supabaseダッシュボードの
 Account > Access Tokens でトークンを発行し、`npx supabase login --token <発行したトークン>` を使う。
 
-- [ ] **Step 2: プロジェクト「ボイスロジ」のproject refを確認する**
+- [x] **Step 2: プロジェクト「v-logi」のproject refを確認する**
 
 ```bash
 npx supabase projects list
 ```
 
-出力の中から名前が「ボイスロジ」の行の `REFERENCE ID` を控える（以降 `<project-ref>` と表記）。
+出力の中から名前が「v-logi」の行の `REFERENCE ID` を控える（以降 `<project-ref>` と表記）。
+実際の値: `tggdbwsqpvzsojwuwlcn`。
 
-- [ ] **Step 3: Supabaseプロジェクト設定から接続情報を取得する**
+- [x] **Step 3: Supabaseプロジェクト設定から接続情報を取得する**
 
 Supabaseダッシュボード > 対象プロジェクト > Project Settings > API を開き、以下を控える:
 - `Project URL`
 - `anon public` キー
 - `service_role` キー（**絶対にクライアントに露出させない。サーバー専用**）
 
-- [ ] **Step 4: `.env.local` を作成する**
+`npx supabase projects api-keys --project-ref <project-ref>` でも取得できる
+（レガシー形式のanon/service_roleキーがJWTとしてそのまま返る）。
+
+- [x] **Step 4: `.env.local` を作成する**
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=<Project URLをそのまま貼る>
@@ -74,7 +85,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service_roleキーをそのまま貼る>
 SUPABASE_PROJECT_REF=<project-ref>
 ```
 
-- [ ] **Step 5: `.env.example` を作成する（値は空でキー名だけ）**
+- [x] **Step 5: `.env.example` を作成する（値は空でキー名だけ）**
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
@@ -83,13 +94,13 @@ SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_PROJECT_REF=
 ```
 
-- [ ] **Step 6: 動作確認**
+- [x] **Step 6: 動作確認**
 
 ```bash
 npx supabase projects list
 ```
 
-Expected: エラーなく一覧が表示され、「ボイスロジ」が含まれる。
+Expected: エラーなく一覧が表示され、「v-logi」が含まれる。
 
 - [ ] **Step 7: `.env.example` だけをコミット**
 
@@ -911,6 +922,6 @@ git commit -m "新実装のセットアップ手順をREADMEに追加"
 
 - [ ] `legacy/` に旧実装一式が退避されている
 - [ ] リポジトリ直下でNext.jsアプリが `pnpm dev` / `pnpm build` できる
-- [ ] Supabaseプロジェクト「ボイスロジ」に7テーブルが作成され、全テーブルでRLSが有効
+- [ ] Supabaseプロジェクト「v-logi」に7テーブルが作成され、全テーブルでRLSが有効
 - [ ] `pnpm test` が全てPASSする（一意制約テスト・RLSテスト・Server Actionテストを含む）
 - [ ] `http://localhost:3000` でstaff件数が表示される

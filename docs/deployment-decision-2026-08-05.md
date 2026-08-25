@@ -4,6 +4,11 @@
 > **Vercel（Pro）＋ Supabase** のクラウド構成に確定。事務所LAN内限定・月額0円の
 > 方針は取り下げ。詳細は `docs/superpowers/specs/2026-08-25-supabase-db-setup-design.md`
 > を参照。以下は経緯を残すためにそのまま保存する（削除しない）。
+>
+> **【2026-08-25 追記2】旧Supabaseプロジェクト「ボイスロジ」は一時停止（pause）状態から
+> 復元できなかったため、同日中に新規プロジェクト **「v-logi」**（ref: `tggdbwsqpvzsojwuwlcn`、
+> AWS ap-northeast-1）を作り直した。以降「ボイスロジ」という名称が出てきたら「v-logi」の
+> ことだと読み替える。
 
 **CLAUDE.md の「デプロイ = Vercel」は破棄。** 本人へのヒヤリングで下記が確定した。
 着手時に蒸し返さないこと。

@@ -17,7 +17,7 @@
 
 | 項目 | 決定 | 補足 |
 | --- | --- | --- |
-| DB | Supabase Postgres（プロジェクト「ボイスロジ」、既存） | オフライン時に配車盤が止まるリスクは許容 |
+| DB | Supabase Postgres（プロジェクト「v-logi」、既存） | オフライン時に配車盤が止まるリスクは許容 |
 | デプロイ | Vercel（Pro プラン） | `docs/deployment-decision-2026-08-05.md` のLAN内運用方針は撤回。Hobbyは商用利用不可のためProが必要 |
 | DBアクセス | ORM無し。Server Actions内で `supabase-js` を直接使用 | CLAUDE.mdのDrizzle方針から変更（本人指示） |
 | スキーマ管理 | `supabase/migrations/*.sql` をgit管理し `supabase db push` で適用 | ダッシュボードでの手動変更はしない方針は維持 |
@@ -31,7 +31,7 @@ DBフェッチ1単位=1コンポーネント=1 Suspense境界などのCLAUDE.md�
 
 1. `webapp/` `scripts/` `output/` を `legacy/` へ退避
 2. リポジトリ直下にNext.js 16 + TypeScript + Tailwindの最小雛形を作成（shadcn無し、画面はまだ作らない）
-3. `npx supabase login` / `npx supabase link` でプロジェクト「ボイスロジ」に接続し、
+3. `npx supabase login` / `npx supabase link` でプロジェクト「v-logi」に接続し、
    接続情報を `.env.local`（gitignore対象）に設定
 4. 下記スキーマのマイグレーションSQLを作成し、`supabase db push` で実テーブルを作成
 5. 全テーブルでRLSを有効化し、暫定の全許可ポリシーを設定
