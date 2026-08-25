@@ -48,18 +48,21 @@ export type Database = {
       }
       placement_slots: {
         Row: {
+          department: string
           ended_at: string | null
           id: string
           opened_at: string
           site_id: string
         }
         Insert: {
+          department: string
           ended_at?: string | null
           id?: string
           opened_at?: string
           site_id: string
         }
         Update: {
+          department?: string
           ended_at?: string | null
           id?: string
           opened_at?: string
