@@ -34,6 +34,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# .env.example は接続情報のテンプレートなのでコミット対象に残す
+!.env.example
 
 # vercel
 .vercel
