@@ -14,6 +14,11 @@ export async function SiteGroupCard({
   department: '土木' | '運輸'
 }) {
   const detail = await getSiteGroupDetail(slotId)
+
+  if (detail.staffMembers.length === 0 && detail.parkedVehicles.length === 0) {
+    return null
+  }
+
   const drivenVehicles = detail.staffMembers.filter((m) => m.vehicle)
   const vehicleCount = drivenVehicles.length + detail.parkedVehicles.length
   const title =
