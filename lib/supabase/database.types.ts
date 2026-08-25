@@ -81,6 +81,7 @@ export type Database = {
           category: string
           created_at: string
           display_order: number
+          furigana: string | null
           id: string
           name: string
           usage_count: number
@@ -90,6 +91,7 @@ export type Database = {
           category: string
           created_at?: string
           display_order?: number
+          furigana?: string | null
           id?: string
           name: string
           usage_count?: number
@@ -99,6 +101,7 @@ export type Database = {
           category?: string
           created_at?: string
           display_order?: number
+          furigana?: string | null
           id?: string
           name?: string
           usage_count?: number
