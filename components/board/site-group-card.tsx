@@ -21,8 +21,10 @@ export async function SiteGroupCard({
 
   const drivenVehicles = detail.staffMembers.filter((m) => m.vehicle)
   const vehicleCount = drivenVehicles.length + detail.parkedVehicles.length
+  // 車両欄の表示可否は部門ではなくデータで決める。土木の作業員が運輸のダンプに
+  // 乗っている日は、土木側の配置枠でも車両札を出す必要があるため。
   const title =
-    department === '運輸'
+    vehicleCount > 0
       ? `${label}（${detail.staffMembers.length}人/${vehicleCount}台）`
       : `${label}（${detail.staffMembers.length}人）`
 
@@ -35,7 +37,7 @@ export async function SiteGroupCard({
           ))}
         </div>
         <SiteTag name={label} />
-        {department === '運輸' ? (
+        {vehicleCount > 0 ? (
           <div className="flex flex-wrap gap-2">
             {drivenVehicles.map((member) => (
               <VehicleTag
