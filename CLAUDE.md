@@ -8,11 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## このリポジトリの現状
 
-配車・出退勤ボードを **Next.js + Supabase で作り直している最中**。現時点でリポジトリにあるのは旧実装のみで、新アプリはまだ存在しない。
+配車・出退勤ボードを **Next.js + Supabase で作り直している最中**。新アプリの土台（Next.js 16 + Supabase 接続 + スキーマ）は**リポジトリ直下に存在する**が、盤面の機能はこれから移植していく段階。
 
-- `webapp/` … 旧実装（素の HTML/CSS/JS + localStorage）。**動く仕様書として扱う。** 特に `webapp/README.md` に、実運用で確定した画面仕様・操作フロー・集計ルールが日本語で詳細に書かれている。新実装の要件はここから起こす。
-- `scripts/`, `output/` … さらに前の Excel 版の名残。参照価値は低い。
-- 新アプリは**リポジトリ直下**に作る。着手時に `webapp/` と `scripts/` と `output/` を `legacy/` へ退避する（未実施 — 最初の issue で行う）。
+- `app/`, `components/`, `lib/`, `supabase/`, `tests/` … 新実装。リポジトリ直下に置く。
+- `legacy/webapp/` … 旧実装（素の HTML/CSS/JS + localStorage）。**動く仕様書として扱う。** 特に `legacy/webapp/README.md` に、実運用で確定した画面仕様・操作フロー・集計ルールが日本語で詳細に書かれている。**未移植の挙動の要件は、いまもここから起こす。**
+- `legacy/scripts/`, `legacy/output/` … さらに前の Excel 版の名残。参照価値は低い。
+- 旧実装（`webapp/` / `scripts/` / `output/`）の `legacy/` への退避は**完了済み**。
 
 ## 技術スタック
 
@@ -26,11 +27,11 @@ npm レジストリで確認済みの最新版（2026-08-03 時点）を使う�
 | スタイル | Tailwind CSS | |
 | コンポーネント | shadcn/ui | 後述の方針を参照 |
 | DB | Supabase Postgres | |
-| DB アクセス | Drizzle ORM | スキーマ・マイグレーションを TypeScript でコード管理 |
+| DB アクセス | **ORM は使わない。** Next.js の Server Actions / サーバ側モジュールから `supabase-js` を直接呼ぶ | スキーマは `supabase/migrations/` の手書き SQL で管理し、Supabase CLI（`supabase db push`）で適用する。ダッシュボードで手編集しない。経緯は `docs/superpowers/specs/2026-08-25-supabase-db-setup-design.md` |
 | 認証・Realtime | supabase-js | Supabase Auth + RLS、Supabase Realtime |
 | テスト | Vitest（単体） / Playwright（E2E） | |
 | パッケージマネージャ | pnpm | |
-| デプロイ | Vercel | `main` = 本番 |
+| デプロイ | Vercel（Pro） | `main` = 本番。この決定は一度「事務所LAN内限定」へ覆り、その後 Vercel に戻った経緯がある。蒸し返す前に `docs/deployment-decision-2026-08-05.md`（2026-08-25 の追記・追記2 を含む）を読むこと |
 
 ## 開発フロー
 
@@ -93,7 +94,7 @@ main（本番 / Vercel Production）
 
 ### データベース
 
-- スキーマは Drizzle でコード定義し、マイグレーションを git 管理する。Supabase ダッシュボードで手動変更しない。
+- スキーマは `supabase/migrations/` の手書き SQL で定義し、git 管理する。Supabase ダッシュボードで手動変更しない。
 - **RLS を有効にする。** Supabase Auth のセッションを前提にポリシーを書く。service role キーをクライアントに露出させない。
 - 複数端末で同じ盤面を見るため、**Supabase Realtime で状態を同期する。** 「操作した端末だけ最新」にしない。
 
@@ -104,7 +105,7 @@ main（本番 / Vercel Production）
 
 ## 引き継ぐべきドメインの不変条件
 
-旧実装が実運用の中で獲得したルール。新実装でも**必ず維持する**。詳細な背景は `webapp/README.md` と `webapp/app.js` のコメントにある。
+旧実装が実運用の中で獲得したルール。新実装でも**必ず維持する**。詳細な背景は `legacy/webapp/README.md` と `legacy/webapp/app.js` のコメントにある。
 
 - **現場名で人・車両をグルーピングしない。** 同じ現場に複数の「配置枠」が同時に存在しうる（フェアロード①②③）。必ず配置枠の ID を介して分類する。
 - **「通常ダンプ」と「当日の乗車ダンプ」は別データ。** 当日だけ別の車両に乗せても、その人の通常ダンプ設定は変わらない。
