@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from './database.types'
 
-export function createServerSupabaseClient(): SupabaseClient {
+export function createServerSupabaseClient(): SupabaseClient<Database> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -10,5 +11,5 @@ export function createServerSupabaseClient(): SupabaseClient {
     )
   }
 
-  return createClient(url, anonKey)
+  return createClient<Database>(url, anonKey)
 }

@@ -1,3 +1,19 @@
+-- ============================================================================
+-- 【警告】このマイグレーションのポリシーは開発用の暫定措置である。
+--
+-- ここで作成しているポリシーは全テーブルに対して using (true) / with check (true)、
+-- つまり「誰でも読める・誰でも書ける」全許可ポリシーである。RLS は有効化されているが、
+-- 実質的に何も制限していない。anon キー（NEXT_PUBLIC_SUPABASE_ANON_KEY）を持つ者は
+-- staff / sites / attendance_events など全テーブルを自由に読み書きできる。
+-- anon キーはブラウザに配信されるため、URL を知っている人間は誰でもこの権限を持つ。
+--
+-- **公開 URL（Vercel 等）へデプロイしてはならない。**
+-- ローカル開発と、接続確認・スキーマ検証のためだけに使うこと。
+--
+-- 公開する前に必ず、Supabase Auth のセッション（auth.uid() / auth.jwt()）を前提とした
+-- 認証込みのポリシーへ差し替える新しいマイグレーションを追加すること。
+-- ============================================================================
+
 alter table staff enable row level security;
 alter table vehicles enable row level security;
 alter table sites enable row level security;
