@@ -1,5 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { attendanceStatusByStaff, type AttendanceStatus } from '@/lib/board/attendance-status'
+import {
+  attendanceLookbackCutoff,
+  attendanceStatusByStaff,
+  type AttendanceStatus,
+} from '@/lib/board/attendance-status'
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000'
 
@@ -44,6 +48,7 @@ export async function getSiteGroupDetail(slotId: string): Promise<SiteGroupDetai
     .from('attendance_events')
     .select('staff_id, action, occurred_at')
     .in('staff_id', staffIds.length > 0 ? staffIds : [NIL_UUID])
+    .gte('occurred_at', attendanceLookbackCutoff(new Date()))
 
   if (eventError) {
     throw new Error(`出退勤イベントの取得に失敗しました: ${eventError.message}`)

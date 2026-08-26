@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { attendanceStatusByStaff, currentAttendanceStatus } from '@/lib/board/attendance-status'
+import {
+  ATTENDANCE_LOOKBACK_DAYS,
+  attendanceLookbackCutoff,
+  attendanceStatusByStaff,
+  currentAttendanceStatus,
+} from '@/lib/board/attendance-status'
 
 describe('currentAttendanceStatus', () => {
   it('イベントが無ければ退勤中(absent)扱い', () => {
@@ -34,5 +39,16 @@ describe('attendanceStatusByStaff', () => {
     expect(result.get('a')).toBe('present')
     expect(result.get('b')).toBe('absent')
     expect(result.get('c')).toBeUndefined()
+  })
+})
+
+describe('attendanceLookbackCutoff', () => {
+  it('基準時刻からATTENDANCE_LOOKBACK_DAYS日前のISO時刻を返す', () => {
+    const now = new Date('2026-08-26T12:00:00.000Z')
+
+    const cutoff = attendanceLookbackCutoff(now)
+
+    const expected = new Date(now.getTime() - ATTENDANCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+    expect(cutoff).toBe(expected.toISOString())
   })
 })
