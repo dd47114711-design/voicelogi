@@ -1,5 +1,13 @@
 export type AttendanceStatus = 'present' | 'absent'
 
+/**
+ * attendance_eventsを取得する際に遡る日数。
+ * 運用期間が長くなるほど取得件数が増え続けるのを防ぐための探索範囲であり、
+ * 出退勤の自動失効化(しきい値超えで強制的に退勤済み扱いにする機能)ではない。
+ * 24時間を超える連続勤務もあり得るため、1シフトの長さより十分に長い値にする。
+ */
+export const ATTENDANCE_LOOKBACK_DAYS = 7
+
 export interface AttendanceEvent {
   action: 'clockIn' | 'clockOut'
   occurredAt: string
@@ -21,6 +29,10 @@ export function currentAttendanceStatus(events: AttendanceEvent[]): AttendanceSt
   )
 
   return latest.action === 'clockIn' ? 'present' : 'absent'
+}
+
+export function attendanceLookbackCutoff(now: Date): string {
+  return new Date(now.getTime() - ATTENDANCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
 }
 
 export function attendanceStatusByStaff(
