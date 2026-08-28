@@ -49,7 +49,8 @@ test.describe('配車・出退勤ボード', () => {
   })
 
   test('配置枠と担当者が盤面に表示される', async ({ page }) => {
-    await page.goto('/')
+    // 盤面が部門タブ化されたため、運輸のフィクスチャは運輸タブで確認する。
+    await page.goto('/?dept=unyu')
     // 初回ナビゲーション直後はSuspenseの読み込み中表示（例:「〜を読み込み中...」）と
     // 解決後の本表示が一瞬同時にDOMへ残ることがあり、曖昧一致だとstrict mode違反になる。
     // ネットワークが落ち着く＝ストリーミングが完了するまで待ってから照合する。
@@ -61,7 +62,8 @@ test.describe('配車・出退勤ボード', () => {
   })
 
   test('見出しタップで行を折りたためる', async ({ page }) => {
-    await page.goto('/')
+    // 盤面が部門タブ化されたため、運輸のフィクスチャは運輸タブで確認する。
+    await page.goto('/?dept=unyu')
     const heading = page.getByRole('button', { name: /TEST_E2E現場①/ })
     await expect(heading).toBeVisible()
     await heading.click()
