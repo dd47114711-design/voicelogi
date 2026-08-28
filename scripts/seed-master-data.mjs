@@ -1,13 +1,13 @@
 // legacy/webapp/seed.js の実データ(社員・車両・取引先)を、新スキーマに変換して
-// Supabaseへ投入するワンショットスクリプト。
+// Supabaseへ投入するスクリプト。
 //
 // 実行方法: node scripts/seed-master-data.mjs
 //
-// 冪等性: staff/vehicles/sites のいずれかに既にデータがある場合は、
-// 重複投入を防ぐため何もせず終了する(--force で強制実行可能)。
+// 冪等性: 行単位で判定する。sites/vehicles は名前・車番が既に登録済みならスキップし、
+// staff は (氏名, 部門) の組が既に登録済みならスキップする。何度実行しても
+// 未登録のものだけが追加される。
 // 当日の配置状態(placement_slots/staff_placements/vehicle_placements/
 // attendance_events)は投入しない。マスタデータのみ。
-// 事務部門(office)の4名は配車盤の対象外のため除外している。
 
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
@@ -23,9 +23,8 @@ if (!url || !serviceRoleKey) {
 }
 
 const supabase = createClient(url, serviceRoleKey)
-const force = process.argv.includes('--force')
 
-// ---- 元データ(legacy/webapp/seed.jsより。事務部門は除外) ----
+// ---- 元データ(legacy/webapp/seed.jsより) ----
 
 const staffSeed = [
   { name: '黒瀬大祐', department: 'doboku', normalVehicleId: null, order: 1 },
@@ -59,6 +58,10 @@ const staffSeed = [
   { name: '大迫博起', department: 'unyu', normalVehicleId: 'v_18', order: 18 },
   { name: '冨永浩', department: 'unyu', normalVehicleId: 'v_19', order: 19 },
   { name: '栢原勲', department: 'unyu', normalVehicleId: 'v_20', order: 20 },
+  { name: '黒瀬とも美', department: 'office', normalVehicleId: null, order: 1 },
+  { name: '山内舞', department: 'office', normalVehicleId: null, order: 2 },
+  { name: '江川愛梨', department: 'office', normalVehicleId: null, order: 3 },
+  { name: '谷口扶美代', department: 'office', normalVehicleId: null, order: 4 },
 ]
 
 const vehiclesSeed = [
@@ -174,68 +177,91 @@ const sitesSeed = [
   { name: '㈱山口舗道', furigana: 'ヤマグチホドウ', category: 'unyu', order: 87 },
 ]
 
-const departmentMap = { doboku: '土木', unyu: '運輸' }
+const departmentMap = { doboku: '土木', unyu: '運輸', office: '事務' }
 const categoryMap = { common: '共通', unyu: '運輸' }
 
 async function main() {
-  const { count: staffCount } = await supabase.from('staff').select('*', { count: 'exact', head: true })
-  const { count: vehicleCount } = await supabase.from('vehicles').select('*', { count: 'exact', head: true })
-  const { count: siteCount } = await supabase.from('sites').select('*', { count: 'exact', head: true })
+  // --- sites: 名前が未登録のものだけ入れる ---
+  const { data: existingSites, error: sitesFetchError } = await supabase.from('sites').select('name')
+  if (sitesFetchError) throw new Error(`sites取得に失敗: ${sitesFetchError.message}`)
+  const knownSiteNames = new Set((existingSites ?? []).map((s) => s.name))
+  const newSites = sitesSeed.filter((s) => !knownSiteNames.has(s.name))
 
-  if (!force && ((staffCount ?? 0) > 0 || (vehicleCount ?? 0) > 0 || (siteCount ?? 0) > 0)) {
-    console.error(
-      `既にデータが存在します(staff:${staffCount}, vehicles:${vehicleCount}, sites:${siteCount})。` +
-        '重複投入を避けるため中止しました。強制実行する場合は --force を付けてください。',
+  if (newSites.length > 0) {
+    console.log(`sitesを${newSites.length}件投入中...`)
+    const { error } = await supabase.from('sites').insert(
+      newSites.map((s) => ({
+        name: s.name,
+        furigana: s.furigana,
+        category: categoryMap[s.category],
+        display_order: s.order,
+      })),
     )
-    process.exit(1)
+    if (error) throw new Error(`sites投入に失敗: ${error.message}`)
   }
 
-  console.log('sitesを投入中...')
-  const { error: sitesError } = await supabase.from('sites').insert(
-    sitesSeed.map((s) => ({
-      name: s.name,
-      furigana: s.furigana,
-      category: categoryMap[s.category],
-      display_order: s.order,
-    })),
-  )
-  if (sitesError) throw new Error(`sites投入に失敗: ${sitesError.message}`)
+  // --- vehicles: 車番が未登録のものだけ入れる ---
+  const { data: existingVehicles, error: vehiclesFetchError } = await supabase
+    .from('vehicles')
+    .select('vehicle_number')
+  if (vehiclesFetchError) throw new Error(`vehicles取得に失敗: ${vehiclesFetchError.message}`)
+  const knownVehicleNumbers = new Set((existingVehicles ?? []).map((v) => v.vehicle_number))
+  const newVehicles = vehiclesSeed.filter((v) => !knownVehicleNumbers.has(v.vehicleNumber))
 
-  console.log('vehiclesを投入中...')
-  const { error: vehiclesError } = await supabase.from('vehicles').insert(
-    vehiclesSeed.map((v) => ({
-      display_name: v.displayName,
-      vehicle_number: v.vehicleNumber,
-      vehicle_type: v.vehicleType,
-      display_order: v.order,
-    })),
-  )
-  if (vehiclesError) throw new Error(`vehicles投入に失敗: ${vehiclesError.message}`)
+  if (newVehicles.length > 0) {
+    console.log(`vehiclesを${newVehicles.length}件投入中...`)
+    const { error } = await supabase.from('vehicles').insert(
+      newVehicles.map((v) => ({
+        display_name: v.displayName,
+        vehicle_number: v.vehicleNumber,
+        vehicle_type: v.vehicleType,
+        display_order: v.order,
+      })),
+    )
+    if (error) throw new Error(`vehicles投入に失敗: ${error.message}`)
+  }
 
-  const { data: insertedVehicles, error: fetchVehiclesError } = await supabase
+  // --- staff: (氏名, 部門) が未登録のものだけ入れる ---
+  // 通常ダンプの紐付けに車両IDが要るため、車両を入れ終わってから引き直す。
+  const { data: allVehicles, error: refetchVehiclesError } = await supabase
     .from('vehicles')
     .select('id, vehicle_number')
-  if (fetchVehiclesError) throw new Error(`vehicles取得に失敗: ${fetchVehiclesError.message}`)
+  if (refetchVehiclesError) throw new Error(`vehicles再取得に失敗: ${refetchVehiclesError.message}`)
 
-  const vehicleIdByNumber = new Map(insertedVehicles.map((v) => [v.vehicle_number, v.id]))
+  const vehicleIdByNumber = new Map(allVehicles.map((v) => [v.vehicle_number, v.id]))
   const vehicleNumberByLegacyId = new Map(vehiclesSeed.map((v) => [v.legacyId, v.vehicleNumber]))
 
-  console.log('staffを投入中...')
-  const { error: staffError } = await supabase.from('staff').insert(
-    staffSeed.map((s) => {
-      const vehicleNumber = s.normalVehicleId ? vehicleNumberByLegacyId.get(s.normalVehicleId) : null
-      const normalVehicleId = vehicleNumber ? vehicleIdByNumber.get(vehicleNumber) : null
-      return {
-        name: s.name,
-        department: departmentMap[s.department],
-        normal_vehicle_id: normalVehicleId ?? null,
-        display_order: s.order,
-      }
-    }),
+  const { data: existingStaff, error: staffFetchError } = await supabase
+    .from('staff')
+    .select('name, department')
+  if (staffFetchError) throw new Error(`staff取得に失敗: ${staffFetchError.message}`)
+  const knownStaff = new Set((existingStaff ?? []).map((s) => `${s.name} ${s.department}`))
+  const newStaff = staffSeed.filter(
+    (s) => !knownStaff.has(`${s.name} ${departmentMap[s.department]}`),
   )
-  if (staffError) throw new Error(`staff投入に失敗: ${staffError.message}`)
 
-  console.log(`完了: staff ${staffSeed.length}件 / vehicles ${vehiclesSeed.length}件 / sites ${sitesSeed.length}件`)
+  if (newStaff.length > 0) {
+    console.log(`staffを${newStaff.length}件投入中...`)
+    const { error } = await supabase.from('staff').insert(
+      newStaff.map((s) => {
+        const vehicleNumber = s.normalVehicleId
+          ? vehicleNumberByLegacyId.get(s.normalVehicleId)
+          : null
+        const normalVehicleId = vehicleNumber ? vehicleIdByNumber.get(vehicleNumber) : null
+        return {
+          name: s.name,
+          department: departmentMap[s.department],
+          normal_vehicle_id: normalVehicleId ?? null,
+          display_order: s.order,
+        }
+      }),
+    )
+    if (error) throw new Error(`staff投入に失敗: ${error.message}`)
+  }
+
+  console.log(
+    `完了: 新規投入 staff ${newStaff.length}件 / vehicles ${newVehicles.length}件 / sites ${newSites.length}件`,
+  )
 }
 
 main().catch((err) => {
