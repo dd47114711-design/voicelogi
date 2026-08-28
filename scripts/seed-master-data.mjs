@@ -235,9 +235,11 @@ async function main() {
     .from('staff')
     .select('name, department')
   if (staffFetchError) throw new Error(`staff取得に失敗: ${staffFetchError.message}`)
-  const knownStaff = new Set((existingStaff ?? []).map((s) => `${s.name} ${s.department}`))
+  // 区切り文字には人名に絶対に現れない\u0000(NUL文字)を使う。半角スペースは
+  // ローマ字表記や姓名区切りなど人名に含まれうるため、区切り文字には使わない。
+  const knownStaff = new Set((existingStaff ?? []).map((s) => `${s.name}\u0000${s.department}`))
   const newStaff = staffSeed.filter(
-    (s) => !knownStaff.has(`${s.name} ${departmentMap[s.department]}`),
+    (s) => !knownStaff.has(`${s.name}\u0000${departmentMap[s.department]}`),
   )
 
   if (newStaff.length > 0) {
