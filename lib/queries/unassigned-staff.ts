@@ -1,3 +1,4 @@
+import type { BoardDepartment } from '@/lib/board/department'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   attendanceLookbackCutoff,
@@ -19,7 +20,7 @@ interface StaffRow {
 }
 
 export async function getUnassignedStaff(
-  department: '土木' | '運輸',
+  department: BoardDepartment,
   presence: AttendanceStatus,
 ): Promise<UnassignedStaffMember[]> {
   const supabase = createServerSupabaseClient()

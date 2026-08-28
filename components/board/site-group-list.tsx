@@ -1,8 +1,9 @@
+import type { BoardDepartment } from '@/lib/board/department'
 import { Suspense } from 'react'
 import { getSiteGroupList } from '@/lib/queries/site-groups'
 import { SiteGroupCard } from './site-group-card'
 
-export async function SiteGroupList({ department }: { department: '土木' | '運輸' }) {
+export async function SiteGroupList({ department }: { department: BoardDepartment }) {
   const groups = await getSiteGroupList(department)
 
   return (

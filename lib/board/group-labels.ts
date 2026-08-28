@@ -1,10 +1,11 @@
+import type { BoardDepartment } from './department'
 import { circledNumber } from './circled-number'
 
 export interface RawSlot {
   slotId: string
   siteId: string
   siteName: string
-  department: '土木' | '運輸'
+  department: BoardDepartment
   openedAt: string
   endedAt: string | null
 }
