@@ -11,18 +11,18 @@ import { NameTag } from '@/components/ui/name-tag'
 export async function OfficeBoard() {
   const members = await getOfficeStaff()
 
-  if (members.length === 0) {
-    return <p className="text-lg">事務員が登録されていません。</p>
-  }
-
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold">事務部門</h2>
-      <div className="flex flex-wrap gap-2">
-        {members.map((member) => (
-          <NameTag key={member.staffId} name={member.name} status={member.status} />
-        ))}
-      </div>
+      {members.length === 0 ? (
+        <p className="text-lg">事務員が登録されていません。</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {members.map((member) => (
+            <NameTag key={member.staffId} name={member.name} status={member.status} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }

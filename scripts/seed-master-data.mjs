@@ -8,6 +8,9 @@
 // 未登録のものだけが追加される。
 // 当日の配置状態(placement_slots/staff_placements/vehicle_placements/
 // attendance_events)は投入しない。マスタデータのみ。
+//
+// このスクリプトはマスタの初期投入用。運用開始後(管理画面から現場名などを
+// 改名したあと)に再実行すると、判定キーがnameのみのため旧名の行が復活しうる。
 
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
