@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { StaffDepartment } from '@/lib/board/department'
+import type { BoardDepartment, StaffDepartment } from '@/lib/board/department'
 import {
   attendanceLookbackCutoff,
   attendanceStatusByStaff,
@@ -12,10 +12,43 @@ export interface AttendanceCounts {
   absent: number
 }
 
+interface StaffRow {
+  id: string
+  department: StaffDepartment
+  staff_placements:
+    | { slot_id: string | null; placement_slots: { department: BoardDepartment } | null }
+    | { slot_id: string | null; placement_slots: { department: BoardDepartment } | null }[]
+    | null
+}
+
+/**
+ * ある従業員が「実際にどの部門のタブに表示されるか」を判定する。
+ * legacyのeffectiveDisplayDept(app.js:720)と同じ規則:
+ * 当日の配置枠があればその配置枠の部門、無ければ本人の基本所属。
+ * 土木の作業員が運輸の配置枠に入っている日は、退勤しても運輸側に
+ * 表示され続けるため、出退勤カウントもそれに合わせる。
+ */
+function effectiveDisplayDepartment(row: StaffRow): StaffDepartment {
+  const placement = Array.isArray(row.staff_placements)
+    ? row.staff_placements[0]
+    : row.staff_placements
+
+  if (placement && placement.slot_id !== null && placement.placement_slots) {
+    return placement.placement_slots.department
+  }
+
+  return row.department
+}
+
 /**
  * 部門ごとの出勤中・退勤済みの人数。
  * 集計結果は保存せず、毎回 attendance_events から数え直す。
  * 打刻が1件も無い人は退勤扱い。
+ *
+ * 対象者は staff.department ではなく effectiveDisplayDepartment() で決める
+ * (盤面のタブ見出しの数字なので、buildDepartmentLanes()と同じ条件に揃える)。
+ * 事務員は配置枠を持てない(DBのCHECK制約で塞がれている)ため、
+ * 常に staff.department で判定される。
  */
 export async function getDepartmentAttendanceCounts(
   department: StaffDepartment,
@@ -24,15 +57,17 @@ export async function getDepartmentAttendanceCounts(
 
   const { data: staffRows, error: staffError } = await supabase
     .from('staff')
-    .select('id')
-    .eq('department', department)
+    .select('id, department, staff_placements(slot_id, placement_slots(department))')
     .eq('active', true)
+    .returns<StaffRow[]>()
 
   if (staffError) {
     throw new Error(`${department}の在籍者取得に失敗しました: ${staffError.message}`)
   }
 
-  const staffIds = (staffRows ?? []).map((row) => row.id)
+  const staffIds = (staffRows ?? [])
+    .filter((row) => effectiveDisplayDepartment(row) === department)
+    .map((row) => row.id)
 
   const { data: eventRows, error: eventError } = await supabase
     .from('attendance_events')

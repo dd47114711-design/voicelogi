@@ -8,13 +8,20 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { getDepartmentAttendanceCounts } from '@/lib/queries/department-attendance'
 
-// getDepartmentAttendanceCounts は .select('id').eq(...).eq(...) と呼んで await する。
-// 2回目の .eq() が Promise を返すようにする。
-function staffQuery(rows: { id: string }[]) {
+interface StaffRowFixture {
+  id: string
+  department: string
+  staff_placements: { slot_id: string | null; placement_slots: { department: string } | null } | null
+}
+
+// getDepartmentAttendanceCounts は department で絞らず在籍者全員を取得し、
+// staff_placements(slot_id, placement_slots(department)) を見て呼び出し側で
+// 表示先部門を判定する。.select(...).eq('active', true).returns() と呼んで await する。
+function staffQuery(rows: StaffRowFixture[]) {
   return {
     select: () => ({
       eq: () => ({
-        eq: () => Promise.resolve({ data: rows, error: null }),
+        returns: () => Promise.resolve({ data: rows, error: null }),
       }),
     }),
   }
@@ -37,7 +44,11 @@ describe('getDepartmentAttendanceCounts', () => {
   it('出勤中と退勤済みを数える', async () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === 'staff') {
-        return staffQuery([{ id: 's1' }, { id: 's2' }, { id: 's3' }])
+        return staffQuery([
+          { id: 's1', department: '土木', staff_placements: null },
+          { id: 's2', department: '土木', staff_placements: null },
+          { id: 's3', department: '土木', staff_placements: null },
+        ])
       }
       return eventQuery([
         { staff_id: 's1', action: 'clockIn', occurred_at: '2026-08-28T00:00:00.000Z' },
@@ -56,5 +67,25 @@ describe('getDepartmentAttendanceCounts', () => {
     )
 
     expect(await getDepartmentAttendanceCounts('事務')).toEqual({ present: 0, absent: 0 })
+  })
+
+  it('土木所属だが運輸の配置枠に入っている人は、運輸のカウントに入り、土木のカウントには入らない', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'staff') {
+        return staffQuery([
+          {
+            id: 's1',
+            department: '土木',
+            staff_placements: { slot_id: 'slot-1', placement_slots: { department: '運輸' } },
+          },
+        ])
+      }
+      return eventQuery([
+        { staff_id: 's1', action: 'clockIn', occurred_at: '2026-08-28T00:00:00.000Z' },
+      ])
+    })
+
+    expect(await getDepartmentAttendanceCounts('運輸')).toEqual({ present: 1, absent: 0 })
+    expect(await getDepartmentAttendanceCounts('土木')).toEqual({ present: 0, absent: 0 })
   })
 })
