@@ -1,5 +1,8 @@
 .worktrees/
 
+# superpowers の作業用スクラッチ（進捗台帳・レビュー資材）。git履歴が記録なので追跡しない。
+.superpowers/
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
