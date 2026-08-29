@@ -1,4 +1,3 @@
-import type { BoardDepartment } from '@/lib/board/department'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   attendanceLookbackCutoff,
@@ -8,42 +7,33 @@ import {
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000'
 
-export interface UnassignedStaffMember {
+export interface OfficeStaffMember {
   staffId: string
   name: string
+  status: AttendanceStatus
 }
 
-interface StaffRow {
-  id: string
-  name: string
-  staff_placements: { slot_id: string | null } | { slot_id: string | null }[] | null
-}
-
-export async function getUnassignedStaff(
-  department: BoardDepartment,
-  presence: AttendanceStatus,
-): Promise<UnassignedStaffMember[]> {
+/**
+ * 事務部門の在籍者を、出退勤状態つきで表示順に返す。
+ * 事務員は配置枠を持たないため、土木・運輸のように「現場未定」「休み」で
+ * 分けず、全員を1つの一覧として返す。
+ */
+export async function getOfficeStaff(): Promise<OfficeStaffMember[]> {
   const supabase = createServerSupabaseClient()
 
   const { data: staffRows, error: staffError } = await supabase
     .from('staff')
-    .select('id, name, staff_placements(slot_id)')
-    .eq('department', department)
+    .select('id, name')
+    .eq('department', '事務')
     .eq('active', true)
-    .returns<StaffRow[]>()
+    .order('display_order', { ascending: true })
 
   if (staffError) {
-    throw new Error(`人員一覧の取得に失敗しました: ${staffError.message}`)
+    throw new Error(`事務員一覧の取得に失敗しました: ${staffError.message}`)
   }
 
-  const unassigned = (staffRows ?? []).filter((row) => {
-    const placement = Array.isArray(row.staff_placements)
-      ? row.staff_placements[0]
-      : row.staff_placements
-    return !placement || placement.slot_id === null
-  })
-
-  const staffIds = unassigned.map((row) => row.id)
+  const staff = staffRows ?? []
+  const staffIds = staff.map((row) => row.id)
 
   const { data: eventRows, error: eventError } = await supabase
     .from('attendance_events')
@@ -63,7 +53,9 @@ export async function getUnassignedStaff(
     })),
   )
 
-  return unassigned
-    .filter((row) => (statusByStaff.get(row.id) ?? 'absent') === presence)
-    .map((row) => ({ staffId: row.id, name: row.name }))
+  return staff.map((row) => ({
+    staffId: row.id,
+    name: row.name,
+    status: statusByStaff.get(row.id) ?? 'absent',
+  }))
 }

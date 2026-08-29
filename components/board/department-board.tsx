@@ -1,3 +1,4 @@
+import type { BoardDepartment } from '@/lib/board/department'
 import { Suspense } from 'react'
 import { CollapsibleBoard } from './collapsible-board'
 import { SiteGroupList } from './site-group-list'
@@ -9,7 +10,7 @@ import { VehicleStatusGroup } from './vehicle-status-group'
 
 const VEHICLE_STATUSES = ['整備', '車検', '故障', '使用停止'] as const
 
-export function DepartmentBoard({ department }: { department: '土木' | '運輸' }) {
+export function DepartmentBoard({ department }: { department: BoardDepartment }) {
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold">{department}部門</h2>

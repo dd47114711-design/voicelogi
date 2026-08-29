@@ -1,3 +1,4 @@
+import type { BoardDepartment } from '@/lib/board/department'
 import { getSiteGroupDetail } from '@/lib/queries/site-group-detail'
 import { CollapsibleSection } from './collapsible-section'
 import { NameTag } from '@/components/ui/name-tag'
@@ -11,7 +12,7 @@ export async function SiteGroupCard({
 }: {
   slotId: string
   label: string
-  department: '土木' | '運輸'
+  department: BoardDepartment
 }) {
   const detail = await getSiteGroupDetail(slotId)
 

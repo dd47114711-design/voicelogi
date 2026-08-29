@@ -1,13 +1,14 @@
+import type { BoardDepartment } from '@/lib/board/department'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { assignGroupLabels, type RawSlot } from '@/lib/board/group-labels'
 
 export interface SiteGroupSummary {
   slotId: string
   label: string
-  department: '土木' | '運輸'
+  department: BoardDepartment
 }
 
-export async function getSiteGroupList(department: '土木' | '運輸'): Promise<SiteGroupSummary[]> {
+export async function getSiteGroupList(department: BoardDepartment): Promise<SiteGroupSummary[]> {
   const supabase = createServerSupabaseClient()
 
   const { data, error } = await supabase
@@ -24,7 +25,7 @@ export async function getSiteGroupList(department: '土木' | '運輸'): Promise
     slotId: row.id,
     siteId: row.site_id,
     siteName: row.sites?.name ?? '現場',
-    department: row.department as '土木' | '運輸',
+    department: row.department as BoardDepartment,
     openedAt: row.opened_at,
     endedAt: row.ended_at,
   }))

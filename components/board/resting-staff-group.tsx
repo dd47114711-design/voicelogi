@@ -1,9 +1,10 @@
+import type { BoardDepartment } from '@/lib/board/department'
 import { getUnassignedStaff } from '@/lib/queries/unassigned-staff'
 import { CollapsibleSection } from './collapsible-section'
 import { NameTag } from '@/components/ui/name-tag'
 import { SiteTag } from '@/components/ui/site-tag'
 
-export async function RestingStaffGroup({ department }: { department: '土木' | '運輸' }) {
+export async function RestingStaffGroup({ department }: { department: BoardDepartment }) {
   const members = await getUnassignedStaff(department, 'absent')
   if (members.length === 0) {
     return null
